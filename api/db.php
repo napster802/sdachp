@@ -358,6 +358,11 @@ function initDB(PDO $db): void {
             text      TEXT NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         CREATE INDEX IF NOT EXISTS idx_bible_abhil82_book_ch ON bible_abhil82(book_num, chapter);
+        CREATE TABLE IF NOT EXISTS bible_reading_progress (
+            device_id         VARCHAR(36) PRIMARY KEY,
+            active_ms_accum   BIGINT DEFAULT 0,
+            last_heartbeat_at BIGINT DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 }
 

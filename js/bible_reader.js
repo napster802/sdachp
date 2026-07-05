@@ -273,6 +273,7 @@ const BibleReader = (function () {
       // Re-query the fresh body after cloning, then attach dblclick handlers
       const freshBody = document.getElementById('bible-reader-body');
       setupDoubleClickHighlight(freshBody, bookNum, chapter);
+      setupReadingTracker(freshBody);
     } catch (e) {
       body.innerHTML = `<div class="bible-loading" style="color:#e74c3c;">Failed to load. ${e.message}</div>`;
     }
@@ -327,6 +328,76 @@ const BibleReader = (function () {
     }, { passive: true });
   }
 
+  // ── Reading rewards ────────────────────────────────────────
+  // Real reading time (evidenced by scroll/swipe activity) earns wallet
+  // points via a server-validated heartbeat - the server measures elapsed
+  // time itself and requires genuine scroll movement each interval, so
+  // idle "leave the tab open" tabs and scripted spam earn nothing (see
+  // api/bible_reading_heartbeat.php for the validation rules).
+  const READING_HEARTBEAT_MS = 5000;
+  let rtEventsSinceHb = 0;
+  let rtScrollDeltaSinceHb = 0;
+  let rtLastScrollTop = null;
+  let rtHeartbeatTimer = null;
+
+  function setupReadingTracker(body) {
+    rtEventsSinceHb = 0;
+    rtScrollDeltaSinceHb = 0;
+    rtLastScrollTop = body.scrollTop;
+
+    const onActivity = () => {
+      const top = body.scrollTop;
+      if (rtLastScrollTop !== null) rtScrollDeltaSinceHb += Math.abs(top - rtLastScrollTop);
+      rtLastScrollTop = top;
+      rtEventsSinceHb++;
+    };
+    body.addEventListener('scroll', onActivity, { passive: true });
+    body.addEventListener('touchmove', onActivity, { passive: true });
+    body.addEventListener('wheel', onActivity, { passive: true });
+
+    startReadingHeartbeat();
+  }
+
+  function startReadingHeartbeat() {
+    if (rtHeartbeatTimer) return; // already running (e.g. jumping between chapters)
+    rtHeartbeatTimer = setInterval(sendReadingHeartbeat, READING_HEARTBEAT_MS);
+    document.addEventListener('visibilitychange', onReadingVisibilityChange);
+  }
+
+  function stopReadingHeartbeat() {
+    if (rtHeartbeatTimer) { clearInterval(rtHeartbeatTimer); rtHeartbeatTimer = null; }
+    document.removeEventListener('visibilitychange', onReadingVisibilityChange);
+  }
+
+  function onReadingVisibilityChange() {
+    // Drop whatever activity was seen right before backgrounding, so coming
+    // back to the tab doesn't instantly bank a burst of "activity" for time
+    // spent away in another app.
+    if (document.hidden) {
+      rtEventsSinceHb = 0;
+      rtScrollDeltaSinceHb = 0;
+    }
+  }
+
+  async function sendReadingHeartbeat() {
+    if (document.hidden) return; // don't even ping the server while backgrounded
+    const events = rtEventsSinceHb;
+    const delta  = Math.round(rtScrollDeltaSinceHb);
+    rtEventsSinceHb = 0;
+    rtScrollDeltaSinceHb = 0;
+    try {
+      const res = await fetch('api/bible_reading_heartbeat.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: Profile.getDeviceId(), events_count: events, scroll_delta: delta }),
+      });
+      const data = await res.json();
+      if (data.success && data.credited_points > 0) {
+        App.showToast(`📖 +${data.credited_points} points for reading!`, 'success');
+      }
+    } catch (e) { /* silent - the next heartbeat retries naturally */ }
+  }
+
   // ── Bookmark ──────────────────────────────────────────────
   function toggleBookmark() {
     if (!curBook) return;
@@ -351,15 +422,16 @@ const BibleReader = (function () {
   }
 
   // ── Back buttons ──────────────────────────────────────────
-  function backToBooks()    { goTo('screen-bible'); renderBookList(); }
+  function backToBooks()    { stopReadingHeartbeat(); goTo('screen-bible'); renderBookList(); }
   function backToChapters() {
+    stopReadingHeartbeat();
     if (curBook) {
       goTo('screen-bible-chapters');
     } else {
       goTo('screen-bible');
     }
   }
-  function backFromBible()  { goTo('screen-home'); }
+  function backFromBible()  { stopReadingHeartbeat(); goTo('screen-home'); }
 
   // ── Verse render helpers ──────────────────────────────────
   function verseHtml(verseNum, rawText, book, chapter) {
