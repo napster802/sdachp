@@ -1,0 +1,83 @@
+/* ============================================================
+   Bible Challenge Arena - Per-Format "How to Play" Instructions
+   Shown in the Host Lobby (live, as the host changes format) and
+   the Join Wait screen (read-only, reflecting the host's choice)
+   so everyone knows the rules before Start Game is pressed.
+   ============================================================ */
+const GameInstructions = (function () {
+  const MODES = {
+    classic: {
+      title: '🎯 Classic (4 Choices)',
+      text: 'Read the question, then tap the answer you think is correct out of 4 choices. Faster correct answers earn more points.'
+    },
+    truefalse: {
+      title: '⚡ Lightning True/False',
+      text: 'A statement is shown. Tap True or False as fast as you can - the clock is tight, so don\'t overthink it!'
+    },
+    scramble: {
+      title: '🔤 Word Scramble',
+      text: 'The letters of the answer are shuffled. Type the unscrambled word before time runs out.'
+    },
+    survival: {
+      title: '💀 Sudden Death Survival',
+      text: 'Same as Classic, but one wrong answer eliminates you. Last player standing wins!'
+    },
+    memory: {
+      title: '🧠 Memory Match',
+      text: 'Flip cards to match each Bible name with its correct verse reference. Find all the pairs as fast as you can.'
+    },
+    twotruths: {
+      title: '🤥 Two Truths and a Lie',
+      text: 'Three statements about a Bible person or event are shown - two are true, one is a lie. Tap the lie.'
+    },
+    higherlower: {
+      title: '📊 Higher or Lower',
+      text: 'Two Bible facts with numbers are shown side by side. Tap the one you think has the BIGGER number.'
+    },
+    versefill: {
+      title: '📖 Verse Fill-in-the-Blank',
+      text: 'A well-known verse is shown with one word missing. Type the missing word - no choices given.'
+    },
+    emojiclue: {
+      title: '🌊 Emoji Story Clue',
+      text: 'An emoji sequence hints at a Bible character, thing, place, or animal. Type your answer in ONE word - a hint badge tells you which category to expect.'
+    },
+    impostor: {
+      title: '🕵️ Word Impostor',
+      text: 'Everyone gets the same secret word except one Impostor, who gets a sneaky related word instead. Give a one-word clue, discuss out loud, then vote out who you think is the Impostor. No timer - rounds advance once everyone has acted. Needs 3+ players.'
+    },
+    draw: {
+      title: '🎨 Sketch & Guess',
+      text: 'Players take turns drawing, in join order. The drawer picks one of 4 secret words and sketches it while everyone else types guesses. The first 3 correct guessers score points, and the drawer earns a bonus for each. Needs 2+ players.'
+    },
+    scrab: {
+      title: '🕎 Bible Scrabble',
+      text: 'Take turns placing Bible words on an 11×11 board — books, characters, places, and concepts all count! Score by letter values and premium squares. Use all 7 tiles for a Miracle Bonus! Needs 2+ players.'
+    },
+    wordhunt: {
+      title: '🔍 Bible Word Hunt',
+      text: 'A 10×20 grid hides Bible words in 8 directions — left, right, up, down & diagonals! Swipe from the first letter to the last to claim a word. In Race mode everyone hunts at once; first to swipe it scores. Longer words score more. 3 rounds, highest total wins!'
+    },
+    blitz: {
+      title: '⚡ Bible Blitz',
+      text: '90 seconds, rapid fire! Questions get harder as time ticks down. First 30s: ⭐ Easy questions worth 50 pts each. 30–60s: 🔥 Medium questions worth 100 pts. Final 30s: 💀 Hard questions worth 200 pts. Highest total score wins!'
+    },
+    bowl: {
+      title: '🏆 Bible Bowl (Teams)',
+      text: 'Team vs Team trivia showdown! Players are split into Team 1 and Team 2. Everyone answers the same questions at the same time — your score adds to your team\'s total. The team with the highest combined score wins the Bible Bowl!'
+    },
+    hotseat: {
+      title: '🎯 Hot Seat Challenge',
+      text: 'One player at a time sits in the 🔥 Hot Seat and answers Bible trivia! Everyone else bets Correct or Wrong before they answer. Nail it? Earn regular points. Right bet? +150 pts! Each player takes a turn — who is the ultimate Bible scholar?'
+    }
+  };
+
+  function render(format, containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const info = MODES[format] || MODES.classic;
+    el.innerHTML = `<p class="instructions-title">${info.title}</p><p class="instructions-text">${info.text}</p>`;
+  }
+
+  return { MODES, render };
+})();

@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a1a3e">
+  <title>Bible Challenge Arena</title>
+  <link rel="stylesheet" href="css/style.css?v=6">
+</head>
+<body>
+  <canvas id="confetti-canvas"></canvas>
+  <div id="toast-container"></div>
+  <div id="reaction-layer"></div>
+  <div id="chat-feed"></div>
+
+  <button class="social-fab" id="social-fab" onclick="Multiplayer.toggleSocialPanel()" style="display:none">💬</button>
+  <div class="social-panel" id="social-panel" style="display:none">
+    <p class="social-section-title">Reactions</p>
+    <div class="social-row">
+      <button class="social-react-btn" onclick="Multiplayer.sendReaction('🔥')">🔥</button>
+      <button class="social-react-btn" onclick="Multiplayer.sendReaction('😂')">😂</button>
+      <button class="social-react-btn" onclick="Multiplayer.sendReaction('👏')">👏</button>
+      <button class="social-react-btn" onclick="Multiplayer.sendReaction('😱')">😱</button>
+      <button class="social-react-btn" onclick="Multiplayer.sendReaction('🙏')">🙏</button>
+      <button class="social-react-btn" onclick="Multiplayer.sendReaction('💯')">💯</button>
+    </div>
+    <p class="social-section-title">Quick Chat</p>
+    <div class="social-row social-row-chat">
+      <button class="social-chat-btn" onclick="Multiplayer.sendChat('nice')">Nice one! 👏</button>
+      <button class="social-chat-btn" onclick="Multiplayer.sendChat('close')">So close! 😅</button>
+      <button class="social-chat-btn" onclick="Multiplayer.sendChat('bring_it')">Bring it on! 💪</button>
+      <button class="social-chat-btn" onclick="Multiplayer.sendChat('wow')">Wow! 😲</button>
+      <button class="social-chat-btn" onclick="Multiplayer.sendChat('ggwp')">Good game! 🤝</button>
+      <button class="social-chat-btn" onclick="Multiplayer.sendChat('oops')">Oops! 🙈</button>
+    </div>
+  </div>
+
+  <div id="app">
+
+    <!-- ==================== SCREEN: HOME ==================== -->
+    <div class="screen active" id="screen-home">
+      <div class="home-bg">
+        <div class="light-ray r1"></div>
+        <div class="light-ray r2"></div>
+        <div class="light-ray r3"></div>
+        <div class="floating-icon i1">🕊️</div>
+        <div class="floating-icon i2">🌿</div>
+        <div class="floating-icon i3">📜</div>
+      </div>
+      <div class="home-content">
+        <div class="logo-section">
+          <div class="logo-icon">📖</div>
+          <p class="church-name">SDA Church House of Prayer</p>
+          <h1 class="logo-title">Bible Challenge Arena</h1>
+          <p class="logo-tagline">Test Your Knowledge of God's Word</p>
+        </div>
+        <div class="home-buttons">
+          <button class="btn btn-secondary btn-xl" onclick="App.goHostGame()">
+            <span>📡</span> Host Game
+          </button>
+          <button class="btn btn-secondary btn-xl" onclick="App.goJoinGame()">
+            <span>🔑</span> Join Game
+          </button>
+        </div>
+        <div class="home-links">
+          <button class="btn btn-ghost" onclick="App.goTo('history')">🏆 Hall of Fame</button>
+          <button class="btn btn-ghost" onclick="BibleReader.open()">📖 Bible</button>
+          <button class="btn btn-ghost" onclick="App.goMyProfile()">👤 My Profile</button>
+          <button class="btn btn-ghost" onclick="App.goShop()">🛍️ Shop</button>
+          <button class="btn btn-ghost" onclick="App.goTo('settings')">⚙️ Settings</button>
+          <button class="btn btn-ghost" onclick="AdminDash.open()">🛡️ Admin</button>
+        </div>
+        <div class="version-tag">Bible Challenge Arena • Offline &amp; LAN Multiplayer</div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: PLAYER PROFILE ==================== -->
+    <div class="screen" id="screen-profile">
+      <div class="screen-header">
+        <button class="btn-back" onclick="App.goTo('home')">‹</button>
+        <h2 id="profile-screen-title">Create Your Profile</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body">
+        <div class="profile-form">
+          <input type="text" id="profile-name-input" class="text-input" placeholder="Your name..." maxlength="20" />
+
+          <h3>Choose an Avatar</h3>
+          <div class="avatar-row" id="profile-avatar-grid"></div>
+
+          <div class="photo-upload-row">
+            <label class="btn btn-secondary" for="profile-photo-upload">🖼️ Upload Photo</label>
+            <input type="file" id="profile-photo-upload" accept="image/*" style="display:none" onchange="Profile.handlePhotoUpload(this)">
+            <img id="profile-photo-preview" class="profile-photo-preview" style="display:none">
+          </div>
+
+          <button class="btn btn-primary btn-xl" id="profile-save-btn" onclick="App.profileSaveContinue()">Save Profile</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: HOST LOBBY ==================== -->
+    <div class="screen" id="screen-host-lobby">
+      <div class="screen-header">
+        <button class="btn-back" onclick="HostGame.leaveLobby()">‹</button>
+        <h2>Host Lobby</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body">
+        <div class="room-code-box">
+          <p class="hint-text">Room Code</p>
+          <div class="room-code" id="host-room-code">------</div>
+          <p class="hint-text">Players join with this code, or pick your room from their Join Game list</p>
+          <div class="custom-code-row" id="host-custom-code-row">
+            <input type="text" id="host-custom-code-input" class="text-input custom-code-input" placeholder="Custom code (optional)" maxlength="6" inputmode="numeric">
+            <button class="btn btn-secondary" onclick="HostGame.setCustomRoomCode()">Set</button>
+          </div>
+          <p class="error-text" id="host-custom-code-error"></p>
+        </div>
+
+        <div class="share-game-box">
+          <p class="hint-text">📱 Share Game — Skip the typing</p>
+          <ol class="share-instructions">
+            <li>Connect their phone to your hotspot/WiFi</li>
+            <li>Scan the QR code below, or open the link</li>
+          </ol>
+          <div class="setting-row" id="share-ip-row" style="display:none;">
+            <span>Your Hotspot IP</span>
+            <input type="text" id="share-ip-input" class="text-input" placeholder="192.168.43.1" oninput="HostGame.setShareIp(this.value)">
+          </div>
+          <p class="hint-text" id="share-ip-hint" style="display:none;">Find this under your phone's Settings → Hotspot &amp; Tethering</p>
+          <div class="share-qr-box" id="share-qr-box"></div>
+          <div class="share-link-row">
+            <input type="text" id="share-link-input" class="text-input share-link-input" readonly onclick="this.select()">
+            <button class="btn btn-secondary" onclick="HostGame.copyShareLink()">📋 Copy</button>
+          </div>
+        </div>
+
+        <div class="lobby-settings">
+          <div class="setting-row">
+            <span>Game Mode</span>
+            <select id="host-format-select" class="select-input" onchange="HostGame.setGameFormat(this.value)">
+              <option value="classic" selected>Classic (4 Choices)</option>
+              <option value="truefalse">⚡ Lightning True/False</option>
+              <option value="scramble">🔤 Word Scramble</option>
+              <option value="survival">💀 Sudden Death Survival</option>
+              <option value="memory">🧠 Memory Match</option>
+              <option value="twotruths">🤥 Two Truths and a Lie</option>
+              <option value="higherlower">📊 Higher or Lower</option>
+              <option value="versefill">📖 Verse Fill-in-the-Blank</option>
+              <option value="emojiclue">🌊 Emoji Story Clue</option>
+              <option value="impostor">🕵️ Word Impostor</option>
+              <option value="draw">🎨 Sketch &amp; Guess</option>
+              <option value="scrab">🕎 Bible Scrabble</option>
+              <option value="wordhunt">🔍 Bible Word Hunt</option>
+              <option value="blitz">⚡ Bible Blitz</option>
+              <option value="bowl">🏆 Bible Bowl (Teams)</option>
+              <option value="hotseat">🎯 Hot Seat Challenge</option>
+            </select>
+          </div>
+          <div class="instructions-box" id="host-instructions-box"></div>
+          <div class="setting-row" id="imp-classes-row" style="display:none;">
+            <span>Class Powers</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="imp-classes-toggle" onchange="HostGame.setImpClasses(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-row" id="host-draw-rounds-row" style="display:none;">
+            <span>Rounds per Player</span>
+            <select id="host-draw-rounds-select" class="select-input" onchange="HostGame.setDrawRounds(this.value)">
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+            </select>
+          </div>
+          <div id="host-trivia-settings">
+          <div class="setting-row">
+            <span>Question Source</span>
+            <select id="host-mode-select" class="select-input" onchange="HostGame.setQuizMode(this.value)">
+              <option value="difficulty" selected>By Difficulty</option>
+              <option value="book">By Book &amp; Category</option>
+            </select>
+          </div>
+          <div class="setting-row" id="host-testament-row" style="display:none;">
+            <span>Testament</span>
+            <select id="host-testament-select" class="select-input" onchange="HostGame.setTestament(this.value)">
+              <option value="all" selected>Whole Bible</option>
+              <option value="ot">Old Testament</option>
+              <option value="nt">New Testament</option>
+            </select>
+          </div>
+          <div class="setting-row" id="host-book-row" style="display:none;">
+            <span>Book</span>
+            <select id="host-book-select" class="select-input" onchange="HostGame.setBook(this.value)"></select>
+          </div>
+          <div class="setting-row" id="host-category-row" style="display:none;">
+            <span>Category</span>
+            <select id="host-category-select" class="select-input" onchange="HostGame.setCategory(this.value)"></select>
+          </div>
+          <p class="hint-text" id="host-book-pool-hint" style="display:none;"></p>
+          <div class="setting-row">
+            <span>Difficulty</span>
+            <select id="host-diff-select" class="select-input" onchange="HostGame.setDifficulty(this.value)">
+              <option value="easy" selected>Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+              <option value="expert">Expert</option>
+            </select>
+          </div>
+          <p class="hint-text" id="host-diff-pool-hint" style="display:none;"></p>
+          <div class="setting-row">
+            <span>Questions</span>
+            <select id="host-qcount-select" class="select-input" onchange="HostGame.setQuestionCount(parseInt(this.value))">
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="30">30</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+          <button class="btn-link" id="host-clear-progress-btn" onclick="HostGame.clearAllProgress()">↺ Clear All Progress (replay used questions)</button>
+          </div>
+          <p class="hint-text" id="host-impostor-hint" style="display:none;">🕵️ Word Impostor needs at least 3 players. No timer - rounds advance once everyone has acted.</p>
+          <p class="hint-text" id="host-draw-hint" style="display:none;">🎨 Sketch &amp; Guess needs at least 2 players. Each player takes a turn drawing while everyone else guesses.</p>
+          <p class="hint-text" id="host-scrab-hint" style="display:none;">🕎 Bible Scrabble needs at least 2 players. Take turns placing Bible words on the 11×11 board for points!</p>
+          <div id="host-scrab-time-row" style="display:none">
+            <label>Turn timer:
+              <select onchange="HostGame.setScrabTimeLimit(+this.value)">
+                <option value="60">60 seconds</option>
+                <option value="90" selected>90 seconds (default)</option>
+                <option value="120">120 seconds</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint-text" id="host-wordhunt-hint" style="display:none;">🔍 Bible Word Hunt needs at least 1 player. Find hidden Bible words in a 10×20 grid — swipe in any direction to claim them before others do!</p>
+          <div id="host-wordhunt-rows" style="display:none">
+            <div class="setting-row">
+              <span>Hunt Mode</span>
+              <select id="host-wordhunt-mode-select" class="select-input" onchange="HostGame.setWordhuntMode(this.value)">
+                <option value="race" selected>🏁 Race (all hunt simultaneously)</option>
+                <option value="turn">🔄 Turn-Based (take turns)</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <span>Rounds</span>
+              <select id="host-wordhunt-rounds-select" class="select-input" onchange="HostGame.setWordhuntRounds(+this.value)">
+                <option value="2">2 Rounds</option>
+                <option value="3" selected>3 Rounds (default)</option>
+                <option value="4">4 Rounds</option>
+              </select>
+            </div>
+          </div>
+          <p class="hint-text" id="host-blitz-hint" style="display:none;">⚡ 90-second rapid fire! Answer as many True/False Bible questions as possible — your own pace, your own questions, 3× bonus in the first 30 seconds!</p>
+          <div id="host-hotseat-panel" style="display:none;">
+            <p class="hint-text">🎯 Hot Seat — 2+ players. Each player takes a turn answering while everyone else bets Correct or Wrong! Bettors earn 150 pts for a right bet.</p>
+            <div class="setting-row">
+              <span>Questions per Seater</span>
+              <select class="select-input" onchange="HostGame.setHsQCount(+this.value)">
+                <option value="3" selected>3 Questions</option>
+                <option value="5">5 Questions</option>
+                <option value="7">7 Questions</option>
+              </select>
+            </div>
+          </div>
+          <div id="host-bowl-panel" style="display:none;">
+            <p class="hint-text">🏆 Bible Bowl — needs at least 2 players. Assign players to teams, then compete on the same questions at the same time. Highest team score wins!</p>
+            <div class="bowl-team-header">
+              <span>Team Assignment</span>
+              <button class="btn btn-secondary" style="padding:0.25rem 0.6rem;font-size:0.8rem;" onclick="HostGame.bowlAutoAssign()">⚡ Auto-Assign</button>
+            </div>
+            <div id="host-bowl-player-list" class="bowl-assign-list"></div>
+          </div>
+        </div>
+
+        <div class="host-csv-upload" id="host-csv-upload-box">
+          <p class="hint-text">Admin: add your own questions for any book/category/difficulty via CSV</p>
+          <div class="host-csv-buttons">
+            <button class="btn btn-secondary" onclick="HostGame.downloadCsvTemplate()">⬇ Download CSV Template</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('host-csv-file-input').click()">📤 Upload Questions CSV</button>
+          </div>
+          <input type="file" id="host-csv-file-input" accept=".csv,text/csv" style="display:none" onchange="HostGame.handleCsvFileSelected(event)">
+          <p class="hint-text" id="host-csv-result"></p>
+        </div>
+
+        <div class="lobby-players">
+          <p class="hint-text" id="host-player-count">1/20 Connected</p>
+          <div class="player-list" id="host-player-list"></div>
+        </div>
+
+        <button class="btn btn-success btn-xl" id="host-start-btn" onclick="HostGame.startGame()">▶ Start Game</button>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: JOIN ENTRY ==================== -->
+    <div class="screen" id="screen-join-entry">
+      <div class="screen-header">
+        <button class="btn-back" onclick="JoinGame.leaveJoinEntry()">‹</button>
+        <h2>Join Game</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body">
+        <div class="room-list-section">
+          <p class="hint-text">Tap a room to join instantly</p>
+          <div class="room-list" id="join-room-list"></div>
+          <p class="hint-text" id="join-room-list-empty" style="display:none;">No open rooms right now. Ask the host to start one, or enter their code below.</p>
+        </div>
+
+        <div class="join-form-divider"><span>or</span></div>
+
+        <div class="join-form">
+          <p class="hint-text">Enter the 6-digit room code from the host</p>
+          <input type="text" id="join-code-input" class="text-input join-code-input" placeholder="000000" maxlength="6" inputmode="numeric">
+          <p class="error-text" id="join-error"></p>
+          <button class="btn btn-secondary btn-xl" onclick="JoinGame.attemptJoin()">Join Room</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: JOIN WAIT ==================== -->
+    <div class="screen" id="screen-join-wait">
+      <div class="screen-header">
+        <button class="btn-back" onclick="JoinGame.leaveLobby()">‹</button>
+        <h2>Waiting for Host</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body">
+        <div class="room-code-box">
+          <p class="hint-text">Room Code</p>
+          <div class="room-code" id="join-wait-code">------</div>
+        </div>
+        <div class="lobby-players">
+          <p class="hint-text">Players</p>
+          <div class="player-list" id="join-wait-player-list"></div>
+        </div>
+        <div class="instructions-box" id="join-instructions-box"></div>
+        <p class="hint-text">The host will start the game soon…</p>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: QUESTION ==================== -->
+    <div class="screen" id="screen-question">
+      <!-- Admin Bar -->
+      <div class="admin-bar" id="admin-bar">
+        <button class="admin-btn" id="pause-btn" onclick="App.togglePause()" title="Pause">⏸</button>
+        <button class="admin-btn" onclick="App.skipQuestion()" title="Skip">⏭</button>
+        <button class="admin-btn" onclick="App.confirmEndGame()" title="End">🚪</button>
+      </div>
+
+      <!-- Question Header -->
+      <div class="q-header">
+        <div class="q-meta">
+          <span class="q-number" id="q-number">Q 1/10</span>
+          <span class="q-category" id="q-category">Old Testament</span>
+        </div>
+        <div class="timer-wrap">
+          <svg class="timer-svg" viewBox="0 0 44 44">
+            <circle class="timer-track" cx="22" cy="22" r="18"/>
+            <circle class="timer-arc" id="timer-arc" cx="22" cy="22" r="18"
+              stroke-dasharray="113.1" stroke-dashoffset="0"/>
+          </svg>
+          <span class="timer-num" id="timer-num">30</span>
+        </div>
+        <div class="player-turn-badge" id="player-turn-badge" style="display:none">
+          <span id="turn-avatar">😊</span>
+          <span id="turn-name">Player</span>
+        </div>
+        <div class="mp-status-badge" id="mp-status-badge" style="display:none"></div>
+      </div>
+
+      <!-- Progress -->
+      <div class="q-progress">
+        <div class="q-progress-fill" id="q-progress-fill" style="width:0%"></div>
+      </div>
+
+      <!-- Points Display -->
+      <div class="pts-bar">
+        <span class="pts-label">Score:</span>
+        <span class="pts-val" id="pts-val">0</span>
+      </div>
+
+      <!-- Bible Bowl team score strip (hidden unless bowl format) -->
+      <div id="bowl-score-strip" style="display:none;">
+        <div class="bowl-strip-team bowl-t1">
+          <span class="bowl-strip-name">Team 1</span>
+          <span class="bowl-strip-score" id="bowl-t1-score">0</span>
+        </div>
+        <div class="bowl-strip-vs">VS</div>
+        <div class="bowl-strip-team bowl-t2">
+          <span class="bowl-strip-name">Team 2</span>
+          <span class="bowl-strip-score" id="bowl-t2-score">0</span>
+        </div>
+      </div>
+
+      <!-- Power-Up Bar (multiplayer contestants only) -->
+      <div class="powerup-bar" id="powerup-bar" style="display:none">
+        <button class="powerup-btn" id="pu-fifty" onclick="Multiplayer.usePowerup('fifty')">
+          <span class="pu-icon">🎯</span>
+          <span class="pu-label">50/50</span>
+          <span class="pu-cost">800</span>
+        </button>
+        <button class="powerup-btn" id="pu-double" onclick="Multiplayer.usePowerup('double')">
+          <span class="pu-icon">⚡</span>
+          <span class="pu-label">2x Points</span>
+          <span class="pu-cost">1,500</span>
+        </button>
+        <button class="powerup-btn" id="pu-freeze" onclick="Multiplayer.openFreezeTargetPicker()">
+          <span class="pu-icon">❄️</span>
+          <span class="pu-label">Freeze</span>
+          <span class="pu-cost">1,000</span>
+        </button>
+        <button class="powerup-btn" id="pu-steal" onclick="Multiplayer.usePowerup('steal')">
+          <span class="pu-icon">🦹</span>
+          <span class="pu-label">Steal</span>
+          <span class="pu-cost">2,000</span>
+        </button>
+        <button class="powerup-btn" id="pu-hint" onclick="Multiplayer.usePowerup('hint')">
+          <span class="pu-icon">💡</span>
+          <span class="pu-label">Hint</span>
+          <span class="pu-cost">400</span>
+        </button>
+        <button class="powerup-btn" id="pu-shield" onclick="Multiplayer.usePowerup('shield')">
+          <span class="pu-icon">🛡️</span>
+          <span class="pu-label">Shield</span>
+          <span class="pu-cost">1,200</span>
+        </button>
+        <span class="pu-wallet-display">💰 <span id="pu-wallet-val">0</span></span>
+      </div>
+
+      <!-- Freeze Banner (shown to a frozen contestant) -->
+      <div class="freeze-banner" id="freeze-banner" style="display:none">
+        ❄️ You've been frozen! <span id="freeze-countdown">5</span>s
+      </div>
+
+      <!-- Eliminated Banner (Sudden Death Survival spectator) -->
+      <div class="eliminated-banner" id="eliminated-banner" style="display:none">
+        💀 You're eliminated — spectating the rest of the game
+      </div>
+
+      <!-- Question Text -->
+      <div class="q-box">
+        <p class="q-text" id="q-text">Loading...</p>
+      </div>
+
+      <!-- Choices -->
+      <div class="choices-grid" id="choices-grid">
+        <button class="choice choice-a" id="c0" onclick="App.answer(0)">
+          <span class="choice-ltr">A</span>
+          <span class="choice-txt" id="c0-txt"></span>
+        </button>
+        <button class="choice choice-b" id="c1" onclick="App.answer(1)">
+          <span class="choice-ltr">B</span>
+          <span class="choice-txt" id="c1-txt"></span>
+        </button>
+        <button class="choice choice-c" id="c2" onclick="App.answer(2)">
+          <span class="choice-ltr">C</span>
+          <span class="choice-txt" id="c2-txt"></span>
+        </button>
+        <button class="choice choice-d" id="c3" onclick="App.answer(3)">
+          <span class="choice-ltr">D</span>
+          <span class="choice-txt" id="c3-txt"></span>
+        </button>
+      </div>
+
+      <!-- Lightning True/False -->
+      <div class="tf-grid" id="tf-grid" style="display:none">
+        <p class="tf-statement" id="tf-statement"></p>
+        <button class="choice tf-true" id="tf-true">✅ TRUE</button>
+        <button class="choice tf-false" id="tf-false">❌ FALSE</button>
+      </div>
+
+      <!-- Word Scramble -->
+      <div class="scramble-box" id="scramble-box" style="display:none">
+        <p class="hint-text">Unscramble the answer:</p>
+        <p class="scramble-word" id="scramble-word"></p>
+        <input type="text" id="scramble-input" class="text-input" placeholder="Type your answer" autocomplete="off">
+        <button class="btn btn-primary btn-xl" id="scramble-submit-btn">Submit</button>
+        <p class="scramble-result" id="scramble-result" style="display:none"></p>
+      </div>
+
+      <!-- Memory Match -->
+      <div class="memory-box" id="memory-box" style="display:none">
+        <p class="hint-text">Match each name to its verse reference <span id="memory-pairs-found">0/6</span></p>
+        <div class="memory-board" id="memory-board"></div>
+      </div>
+
+      <!-- Two Truths and a Lie -->
+      <div class="twotruths-box" id="twotruths-box" style="display:none">
+        <p class="hint-text" id="twotruths-subject"></p>
+        <div class="twotruths-list" id="twotruths-list"></div>
+      </div>
+
+      <!-- Higher or Lower -->
+      <div class="higherlower-box" id="higherlower-box" style="display:none">
+        <p class="hint-text">Tap the one you think is BIGGER!</p>
+        <div class="hl-row">
+          <button class="hl-card" id="hl-card-0"><span class="hl-label" id="hl-label-0"></span><span class="hl-value" id="hl-value-0"></span></button>
+          <span class="hl-vs">VS</span>
+          <button class="hl-card" id="hl-card-1"><span class="hl-label" id="hl-label-1"></span><span class="hl-value" id="hl-value-1"></span></button>
+        </div>
+      </div>
+
+      <!-- Verse Fill-in-the-Blank -->
+      <div class="versefill-box" id="versefill-box" style="display:none">
+        <p class="hint-text">Type the missing word:</p>
+        <p class="versefill-verse" id="versefill-verse"></p>
+        <input type="text" id="versefill-input" class="text-input" placeholder="Type the missing word" autocomplete="off">
+        <button class="btn btn-primary btn-xl" id="versefill-submit-btn">Submit</button>
+        <p class="versefill-result" id="versefill-result" style="display:none"></p>
+      </div>
+
+      <!-- Emoji Story Clue -->
+      <div class="emojiclue-box" id="emojiclue-box" style="display:none">
+        <p class="hint-text">Guess the Bible story or character:</p>
+        <p class="emojiclue-emojis" id="emojiclue-emojis"></p>
+        <p class="emojiclue-hint" id="emojiclue-hint"></p>
+        <input type="text" id="emojiclue-input" class="text-input" placeholder="Type your guess" autocomplete="off">
+        <button class="btn btn-primary btn-xl" id="emojiclue-submit-btn">Submit</button>
+        <p class="emojiclue-result" id="emojiclue-result" style="display:none"></p>
+      </div>
+
+      <!-- Host Monitor (host does not play - just watches answers come in) -->
+      <div class="host-monitor" id="host-monitor" style="display:none">
+        <p class="hint-text">Watching players answer…</p>
+        <div class="host-monitor-list" id="host-monitor-list"></div>
+        <div class="distribution-chart" id="host-distribution" style="display:none"></div>
+        <div class="host-monitor-actions">
+          <button class="btn btn-secondary" id="host-reveal-btn" onclick="HostGame.forceReveal()">Reveal Now</button>
+          <button class="btn btn-danger" onclick="HostGame.endGame()">🚪 End Game</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: FEEDBACK ==================== -->
+    <div class="screen" id="screen-feedback">
+      <div class="feedback-wrap">
+        <div class="feedback-icon" id="fb-icon">✓</div>
+        <h2 class="feedback-verdict" id="fb-verdict">Correct!</h2>
+        <div class="feedback-pts" id="fb-pts">+1000</div>
+        <div class="fb-streak-badge" id="fb-streak-badge" style="display:none"></div>
+        <div class="feedback-answer-box">
+          <p class="fb-label">Correct Answer:</p>
+          <div class="fb-answer" id="fb-answer"></div>
+          <div class="fb-reference" id="fb-reference"></div>
+        </div>
+        <div class="distribution-chart" id="fb-distribution" style="display:none"></div>
+        <div class="fb-actions">
+          <div id="fb-next-player" style="display:none">
+            <p>Pass device to next player</p>
+            <button class="btn btn-primary btn-xl" onclick="App.nextPlayerOrLeaderboard()">Continue →</button>
+          </div>
+          <div id="fb-leaderboard" style="display:none">
+            <button class="btn btn-primary btn-xl" onclick="App.showLeaderboard()">📊 See Rankings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: LEADERBOARD ==================== -->
+    <div class="screen" id="screen-leaderboard">
+      <div class="lb-header">
+        <h2>🏆 Rankings</h2>
+        <span class="lb-sub" id="lb-sub">After Q1</span>
+      </div>
+      <div class="lb-list" id="lb-list"></div>
+      <div class="lb-footer">
+        <button class="btn btn-primary btn-xl" id="lb-next-btn" onclick="App.nextQuestion()">
+          Next Question →
+        </button>
+        <button class="btn btn-danger btn-xl" id="lb-end-btn" onclick="App.endGame()" style="display:none">
+          🏁 Finish Game
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: IMPOSTOR CLASS REVEAL ==================== -->
+    <div class="screen" id="screen-imp-class-reveal">
+      <div class="screen-header"><h2>🎭 Your Class</h2></div>
+      <div class="screen-body">
+        <div id="imp-cr-player-view">
+          <div class="imp-class-card" id="imp-cr-class-card"></div>
+          <div class="imp-word-card" id="imp-cr-word-card">
+            <p class="hint-text">Your Secret Word</p>
+            <div class="imp-word" id="imp-cr-word">—</div>
+            <div class="imp-role-badge" id="imp-cr-role-badge"></div>
+          </div>
+        </div>
+        <div id="imp-cr-host-view" style="display:none;">
+          <div class="imp-class-grid" id="imp-cr-class-grid"></div>
+          <div class="imp-answerkey" id="imp-cr-answerkey"></div>
+          <button class="btn btn-primary btn-xl" onclick="HostGame.impStartCluePhase()">▶ Begin Round 1</button>
+        </div>
+        <p class="hint-text" id="imp-cr-waiting-text" style="display:none;">Waiting for the host to begin…</p>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: IMPOSTOR CLUE ==================== -->
+    <div class="screen" id="screen-imp-clue">
+      <div class="screen-header">
+        <h2>🕵️ Word Impostor</h2>
+        <span class="mp-status-badge" id="imp-clue-status-badge"></span>
+      </div>
+      <div class="screen-body">
+        <div class="imp-word-card" id="imp-clue-word-card">
+          <p class="hint-text">Your Secret Word</p>
+          <div class="imp-word" id="imp-clue-word">—</div>
+          <div class="imp-role-badge" id="imp-clue-role-badge"></div>
+        </div>
+        <p class="hint-text">Give ONE word or short phrase that hints at your word — without saying it outright. Every clue is revealed together once everyone has submitted.</p>
+        <div class="eliminated-banner" id="imp-clue-eliminated-banner" style="display:none">💀 You're eliminated — spectating the rest of the game</div>
+        <div id="imp-clue-form" style="display:none">
+          <input type="text" id="imp-clue-input" class="text-input" placeholder="Your one-word clue..." maxlength="40">
+          <button class="btn btn-primary btn-xl" id="imp-clue-submit-btn">Submit Clue</button>
+          <p class="hint-text" id="imp-clue-submitted-text" style="display:none">✓ Clue submitted — waiting for others…</p>
+        </div>
+        <div class="host-monitor" id="imp-clue-host-monitor" style="display:none">
+          <div class="imp-answerkey" id="imp-clue-answerkey"></div>
+          <div class="host-monitor-list" id="imp-clue-host-monitor-list"></div>
+          <button class="btn btn-secondary" onclick="HostGame.forceAdvanceImpostor()">⏭ Force Advance (skip stragglers)</button>
+        </div>
+        <div id="imp-class-action-clue"></div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: IMPOSTOR REVEAL ==================== -->
+    <div class="screen" id="screen-imp-reveal">
+      <div class="screen-header">
+        <h2>🕵️ Clues Revealed</h2>
+      </div>
+      <div class="screen-body">
+        <div class="imp-word-card" id="imp-reveal-word-card">
+          <p class="hint-text">Your Secret Word</p>
+          <div class="imp-word" id="imp-reveal-word">—</div>
+          <div class="imp-role-badge" id="imp-reveal-role-badge"></div>
+        </div>
+        <p class="hint-text">Discuss out loud, then the host opens voting.</p>
+        <div class="imp-clue-list" id="imp-reveal-clue-list"></div>
+        <div id="imp-reveal-host-controls" style="display:none">
+          <div class="imp-answerkey" id="imp-reveal-answerkey"></div>
+          <button class="btn btn-primary btn-xl" onclick="HostGame.startImpostorVoting()">🗳️ Start Voting →</button>
+        </div>
+        <p class="hint-text" id="imp-reveal-waiting-text" style="display:none">Waiting for the host to open voting…</p>
+        <div id="imp-class-action-reveal"></div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: IMPOSTOR VOTE ==================== -->
+    <div class="screen" id="screen-imp-vote">
+      <div class="screen-header">
+        <h2>🗳️ Vote Out the Impostor</h2>
+        <span class="mp-status-badge" id="imp-vote-status-badge"></span>
+      </div>
+      <div class="screen-body">
+        <div class="imp-clue-list" id="imp-vote-clue-list"></div>
+        <div class="imp-voted-avatars" id="imp-vote-voted-avatars"></div>
+        <div class="eliminated-banner" id="imp-vote-eliminated-banner" style="display:none">💀 You're eliminated — spectating the rest of the game</div>
+        <div class="imp-vote-list" id="imp-vote-list"></div>
+        <p class="hint-text" id="imp-vote-submitted-text" style="display:none">✓ Vote locked — waiting for others…</p>
+        <div class="host-monitor" id="imp-vote-host-monitor" style="display:none">
+          <div class="imp-answerkey" id="imp-vote-answerkey"></div>
+          <div class="host-monitor-list" id="imp-vote-host-monitor-list"></div>
+          <button class="btn btn-secondary" id="imp-vote-proceed-btn" onclick="HostGame.forceAdvanceImpostor()">⏭ Force Advance (skip stragglers)</button>
+        </div>
+        <div id="imp-class-action-vote"></div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: IMPOSTOR ELIMINATION ==================== -->
+    <div class="screen" id="screen-imp-elim">
+      <div class="screen-header">
+        <h2>Round Result</h2>
+      </div>
+      <div class="screen-body">
+        <div class="imp-elim-banner" id="imp-elim-banner"></div>
+        <div id="imp-elim-host-controls" style="display:none">
+          <div class="imp-answerkey" id="imp-elim-answerkey"></div>
+          <button class="btn btn-primary btn-xl" onclick="HostGame.nextImpostorRound()">Next Round →</button>
+        </div>
+        <p class="hint-text" id="imp-elim-waiting-text" style="display:none">Waiting for the host to continue…</p>
+        <div id="imp-class-action-elim"></div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: IMPOSTOR TIEBREAK ==================== -->
+    <div class="screen" id="screen-imp-tiebreak">
+      <div class="screen-header">
+        <h2>🤝 It's a Tie!</h2>
+      </div>
+      <div class="screen-body">
+        <p class="hint-text">Votes were tied. The host will break the tie.</p>
+        <div class="imp-vote-list" id="imp-tiebreak-list"></div>
+        <div id="imp-tiebreak-host-controls" style="display:none">
+          <div class="imp-answerkey" id="imp-tiebreak-answerkey"></div>
+          <button class="btn btn-secondary btn-xl" onclick="HostGame.resolveImpostorTiebreak(null)">Skip Elimination This Round</button>
+        </div>
+        <p class="hint-text" id="imp-tiebreak-waiting-text" style="display:none">Waiting for the host to decide…</p>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: SKETCH & GUESS - CHOOSE WORD ==================== -->
+    <div class="screen" id="screen-draw-choose">
+      <div class="screen-header">
+        <h2>🎨 Sketch &amp; Guess</h2>
+        <span class="mp-status-badge" id="draw-choose-turn-badge"></span>
+      </div>
+      <div class="screen-body">
+        <div id="draw-choose-drawer-box">
+          <p class="hint-text">Pick a word to draw!</p>
+          <div class="draw-word-choices" id="draw-word-choices"></div>
+        </div>
+        <div id="draw-choose-waiting-box" style="display:none">
+          <p class="hint-text" id="draw-choose-waiting-text"></p>
+        </div>
+        <div class="host-monitor" id="draw-choose-host-monitor" style="display:none">
+          <p class="hint-text" id="draw-choose-host-text"></p>
+          <button class="btn btn-secondary" onclick="HostGame.forceAdvanceDraw()">⏭ Force Advance (skip stalled drawer)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: SKETCH & GUESS - DRAWING ==================== -->
+    <div class="screen" id="screen-draw-active">
+      <div class="screen-header">
+        <h2 id="draw-active-title">🎨 Sketch &amp; Guess</h2>
+        <span class="mp-status-badge" id="draw-active-turn-badge"></span>
+      </div>
+      <div class="screen-body">
+        <div class="draw-color-picker" id="draw-color-picker" style="display:none">
+          <label for="draw-color-input">🎨 Pen color:</label>
+          <input type="color" id="draw-color-input" value="#1a1a1a">
+          <div class="draw-thickness-picker" id="draw-thickness-picker">
+            <button type="button" class="draw-thickness-btn" data-width="2">2x</button>
+            <button type="button" class="draw-thickness-btn" data-width="3">3x</button>
+            <button type="button" class="draw-thickness-btn active" data-width="5">5x</button>
+          </div>
+        </div>
+        <div class="draw-canvas-wrap">
+          <canvas id="draw-canvas" width="600" height="600"></canvas>
+        </div>
+        <div class="draw-correct-avatars" id="draw-correct-avatars"></div>
+        <p class="hint-text" id="draw-active-host-word" style="display:none"></p>
+        <div class="draw-guess-log" id="draw-guess-log"></div>
+        <div id="draw-guess-form">
+          <input type="text" id="draw-guess-input" class="text-input" placeholder="Type your guess..." maxlength="40">
+          <button class="btn btn-primary btn-xl" id="draw-guess-submit-btn">Guess</button>
+          <p class="hint-text" id="draw-guess-correct-text" style="display:none">✓ Correct! Waiting for the round to end…</p>
+        </div>
+        <div class="host-monitor" id="draw-active-host-monitor" style="display:none">
+          <button class="btn btn-secondary" onclick="HostGame.forceAdvanceDraw()">⏭ Reveal Now</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: SKETCH & GUESS - REVEAL ==================== -->
+    <div class="screen" id="screen-draw-reveal">
+      <div class="screen-header">
+        <h2>🖼️ Round Reveal</h2>
+      </div>
+      <div class="screen-body">
+        <div class="draw-canvas-wrap">
+          <canvas id="draw-reveal-canvas" width="600" height="600"></canvas>
+        </div>
+        <p class="hint-text" id="draw-reveal-word-text"></p>
+        <div class="draw-correct-avatars" id="draw-reveal-correct-list"></div>
+        <div id="draw-reveal-host-controls" style="display:none">
+          <button class="btn btn-primary btn-xl" onclick="HostGame.nextDrawTurn()">Next Turn →</button>
+        </div>
+        <p class="hint-text" id="draw-reveal-waiting-text" style="display:none">Waiting for the host to continue…</p>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: BIBLE SCRABBLE - PLACE ==================== -->
+    <div class="screen" id="screen-scrab-place">
+      <div class="screen-header">
+        <h2>🕎 Bible Scrabble</h2>
+        <div class="scrab-status-bar">
+          <span id="scrab-turn-badge" class="scrab-turn-badge"></span>
+          <span id="scrab-timer-badge" class="scrab-timer-badge"></span>
+          <span id="scrab-bag-badge" class="scrab-bag-badge"></span>
+        </div>
+      </div>
+      <div class="screen-body scrab-body">
+        <!-- Player score bar -->
+        <div class="scrab-score-bar" id="scrab-score-bar"></div>
+        <!-- Board -->
+        <div class="scrab-board-container" id="scrab-board-container">
+          <table class="scrab-board" id="scrab-board"></table>
+        </div>
+        <!-- Rack + action buttons (sticky at bottom) -->
+        <div class="scrab-rack-area" id="scrab-rack-area">
+          <div class="scrab-rack-header">
+            <span class="scrab-rack-label">Your Tiles</span>
+            <button class="scrab-help-btn" onclick="Scrabble.toggleHelp()" onmouseenter="Scrabble.openHelp()" onmouseleave="Scrabble.scheduleCloseHelp()" aria-label="How to play Bible Scrabble">?</button>
+          </div>
+          <div class="scrab-rack" id="scrab-rack"></div>
+          <div class="scrab-actions" id="scrab-actions" style="display:none">
+            <button class="btn btn-primary" id="scrab-submit-btn" onclick="Scrabble.submitWord()" disabled>✅ Submit Word</button>
+            <button class="btn btn-secondary" onclick="Scrabble.clearPending()">↩ Clear</button>
+            <button class="btn btn-secondary" onclick="Scrabble.openExchange()">🔄 Exchange</button>
+            <button class="btn btn-secondary" onclick="Scrabble.passTurn()">⏭ Pass</button>
+          </div>
+          <div id="scrab-host-controls" style="display:none">
+            <button class="btn btn-secondary btn-sm" onclick="HostGame.scrabForceSkip()">⏭ Force Skip</button>
+            <button class="btn btn-danger btn-sm" onclick="HostGame.scrabEndGame()">🏁 End Game</button>
+          </div>
+        </div>
+        <!-- Recent plays feed -->
+        <div class="scrab-plays-feed" id="scrab-plays-feed"></div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: BIBLE SCRABBLE - WORD RESULT ==================== -->
+    <div class="screen" id="screen-scrab-word-result">
+      <div class="screen-header">
+        <h2>🕎 Word Played!</h2>
+      </div>
+      <div class="screen-body" style="text-align:center;padding:2rem 1rem;">
+        <div class="scrab-result-word" id="scrab-result-word"></div>
+        <div class="scrab-result-score" id="scrab-result-score"></div>
+        <div class="scrab-result-bonus" id="scrab-result-bonus"></div>
+        <div class="scrab-result-note" id="scrab-result-note"></div>
+        <p class="hint-text" style="margin-top:1.5rem">Next turn starting automatically…</p>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: BIBLE SCRABBLE - EXCHANGE ==================== -->
+    <div class="screen" id="screen-scrab-exchange">
+      <div class="screen-header">
+        <h2>🔄 Exchange Tiles</h2>
+      </div>
+      <div class="screen-body" style="padding:1.5rem;text-align:center;">
+        <p class="hint-text">Select tiles to return to the bag. You will lose your turn.</p>
+        <div class="scrab-rack scrab-rack-exchange" id="scrab-exchange-rack"></div>
+        <div style="margin-top:1.5rem;display:flex;gap:1rem;justify-content:center;">
+          <button class="btn btn-primary" onclick="Scrabble.confirmExchange()">🔄 Exchange Selected</button>
+          <button class="btn btn-secondary" onclick="App.goTo('scrab-place')">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: BIBLE WORD HUNT - ACTIVE ==================== -->
+    <div class="screen" id="screen-wordhunt-active">
+      <div class="screen-header">
+        <h2>🔍 Bible Word Hunt</h2>
+        <div class="wordhunt-status-bar">
+          <span id="wordhunt-round-badge" class="wordhunt-badge">Round 1/3</span>
+          <span id="wordhunt-timer-badge" class="wordhunt-badge wordhunt-timer-badge">3:00</span>
+          <span id="wordhunt-found-badge" class="wordhunt-badge">0/15 found</span>
+        </div>
+      </div>
+      <div class="screen-body wordhunt-body">
+        <div class="wordhunt-score-bar" id="wordhunt-score-bar"></div>
+        <div class="wordhunt-turn-banner" id="wordhunt-turn-banner" style="display:none"></div>
+        <div class="wordhunt-grid-container" id="wordhunt-grid-container">
+          <table class="wordhunt-grid" id="wordhunt-grid"></table>
+        </div>
+        <div class="wordhunt-dir-hint" id="wordhunt-dir-hint"></div>
+        <div class="wordhunt-feed" id="wordhunt-feed"></div>
+        <div class="wordhunt-host-controls" id="wordhunt-host-controls" style="display:none">
+          <button class="btn btn-secondary btn-sm" onclick="WordHunt.forceNext()">⏭ Skip Turn</button>
+          <button class="btn btn-secondary btn-sm" onclick="WordHunt.forceEnd()">🏁 End Game</button>
+        </div>
+        <!-- Inline result panel — shown when round ends, grid stays visible above -->
+        <div id="wordhunt-result-panel" class="wordhunt-result-panel" style="display:none">
+          <p id="wordhunt-result-title" class="wordhunt-result-panel-title"></p>
+          <div id="wordhunt-result-scores" class="wordhunt-round-scores"></div>
+          <div id="wordhunt-result-unclaimed" class="wh-result-unclaimed-section" style="display:none">
+            <p class="wh-result-unclaimed-label">❌ Unclaimed words (highlighted on grid above):</p>
+            <div id="wordhunt-result-unclaimed-list" class="wh-result-unclaimed-chips"></div>
+          </div>
+          <div id="wordhunt-result-host-btns" class="wordhunt-round-controls" style="display:none">
+            <button class="btn btn-primary" id="wordhunt-result-proceed-btn" onclick="WordHunt.proceed()">▶ Next Round</button>
+          </div>
+          <p id="wordhunt-result-waiting" class="hint-text" style="text-align:center;display:none">Waiting for host to proceed…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== BIBLE SCRABBLE HELP MODAL ==================== -->
+    <div class="overlay" id="scrab-help-overlay" style="display:none" onclick="Scrabble.closeHelp(event)">
+      <div class="overlay-card scrab-help-card" onclick="event.stopPropagation()" onmouseenter="Scrabble.openHelp()" onmouseleave="Scrabble.scheduleCloseHelp()">
+        <div class="scrab-help-header">
+          <h2>🕎 How to Play Bible Scrabble</h2>
+          <button class="scrab-help-close" onclick="Scrabble.forceCloseHelp()">✕</button>
+        </div>
+        <div class="scrab-help-body">
+          <div class="scrab-help-section">
+            <h3>Rules</h3>
+            <ul>
+              <li>Take turns placing <strong>Bible words</strong> on the 11×11 board</li>
+              <li>The <strong>first word</strong> must cover the ★ center square</li>
+              <li>Every new word must <strong>connect</strong> to a tile already on the board</li>
+              <li>All words formed across &amp; down must be valid Bible words</li>
+              <li>Your rack refills to 7 tiles after each play</li>
+              <li>Use <strong>↩ Clear</strong> to return tiles to your rack, <strong>🔄 Exchange</strong> to swap tiles with the bag (costs your turn), or <strong>⏭ Pass</strong> to skip your turn</li>
+              <li>Game ends when the tile bag is empty</li>
+            </ul>
+          </div>
+          <div class="scrab-help-section">
+            <h3>Board Squares</h3>
+            <div class="scrab-bonus-grid">
+              <span class="sq-badge sq-tw">COVENANT</span><span>×3 Word — entire word score tripled (corner squares)</span>
+              <span class="sq-badge sq-dw">PROPHET</span><span>×2 Word — entire word score doubled (diagonal squares)</span>
+              <span class="sq-badge sq-tl">SCROLL</span><span>×3 Letter — that tile's points tripled (edge squares)</span>
+              <span class="sq-badge sq-dl">LAMP</span><span>×2 Letter — that tile's points doubled (scattered squares)</span>
+              <span class="sq-badge sq-star">★</span><span>Star of Bethlehem — center square, first word starts here (acts as ×2 Word)</span>
+            </div>
+          </div>
+          <div class="scrab-help-section">
+            <h3>Letter Points</h3>
+            <div class="scrab-pts-grid">
+              <div><span class="pts-val">0</span><span class="pts-tiles">Blank (wild — any letter)</span></div>
+              <div><span class="pts-val">1</span><span class="pts-tiles">A &nbsp;E &nbsp;I &nbsp;L &nbsp;N &nbsp;O &nbsp;R &nbsp;S &nbsp;T &nbsp;U</span></div>
+              <div><span class="pts-val">2</span><span class="pts-tiles">D &nbsp;G</span></div>
+              <div><span class="pts-val">3</span><span class="pts-tiles">B &nbsp;C &nbsp;M &nbsp;P</span></div>
+              <div><span class="pts-val">4</span><span class="pts-tiles">F &nbsp;H &nbsp;V &nbsp;W &nbsp;Y</span></div>
+              <div><span class="pts-val">5</span><span class="pts-tiles">J &nbsp;K</span></div>
+              <div><span class="pts-val">8</span><span class="pts-tiles">X</span></div>
+              <div><span class="pts-val">10</span><span class="pts-tiles">Q &nbsp;Z</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: BIBLE BLITZ ==================== -->
+    <div class="screen" id="screen-blitz-active">
+      <div class="screen-header">
+        <div class="blitz-timer-bar" id="blitz-timer-bar">
+          <div class="blitz-timer-fill" id="blitz-timer-fill"></div>
+          <span class="blitz-timer-text" id="blitz-timer-text">1:30</span>
+        </div>
+        <div class="blitz-score-badge" id="blitz-score-badge">0 pts</div>
+      </div>
+      <div class="screen-body" style="padding:1rem;">
+        <div class="blitz-multiplier-badge" id="blitz-multiplier-badge">3×</div>
+        <div class="question-card" id="blitz-question-card" style="margin-bottom:1rem;"></div>
+        <div class="blitz-answer-flash" id="blitz-answer-flash" style="display:none;"></div>
+        <div class="blitz-choices" id="blitz-choices">
+          <button class="btn btn-blitz-true" id="blitz-btn-true" onclick="Multiplayer.blitzAnswer(true)">✓ TRUE</button>
+          <button class="btn btn-blitz-false" id="blitz-btn-false" onclick="Multiplayer.blitzAnswer(false)">✗ FALSE</button>
+        </div>
+        <div class="blitz-cooldown-msg" id="blitz-cooldown-msg" style="display:none;"></div>
+        <div class="blitz-counter" id="blitz-counter">0 answered</div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: HOT SEAT QUESTION ==================== -->
+    <div class="screen" id="screen-hs-question">
+      <div class="screen-header">
+        <div class="hs-header-info">
+          <div class="hs-fire-badge" id="hs-seater-badge">🔥 <span id="hs-seater-name">Player</span> is in the Hot Seat!</div>
+          <div class="hs-q-progress" id="hs-q-progress">Q 1 of 3</div>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="hs-timer-bar"><div class="hs-timer-fill" id="hs-timer-fill"></div></div>
+        <div class="hs-question-card" id="hs-question-card">Loading question…</div>
+
+        <!-- Seater view: 4 answer choices -->
+        <div id="hs-seater-choices" style="display:none;">
+          <p class="hint-text" id="hs-seater-prompt" style="text-align:center;margin-bottom:0.5rem;">🔥 You're in the Hot Seat! Answer this question:</p>
+          <div class="choices-grid" id="hs-choices-grid">
+            <button class="choice choice-a" id="hsc0"></button>
+            <button class="choice choice-b" id="hsc1"></button>
+            <button class="choice choice-c" id="hsc2"></button>
+            <button class="choice choice-d" id="hsc3"></button>
+          </div>
+          <p class="hint-text" id="hs-seater-answered" style="display:none;text-align:center;margin-top:0.5rem;">✓ Answer locked in! Waiting for reveal…</p>
+        </div>
+
+        <!-- Bettor view: see options + wager coins + bet correct/wrong -->
+        <div id="hs-bettor-view" style="display:none;">
+          <p class="hint-text" style="text-align:center;margin-bottom:0.4rem;font-size:0.8rem;opacity:0.7;">Seater's options (read-only):</p>
+          <div class="choices-grid hs-bettor-choices" id="hs-bettor-choices-grid">
+            <div class="choice choice-a hs-ro-choice" id="hbc0"></div>
+            <div class="choice choice-b hs-ro-choice" id="hbc1"></div>
+            <div class="choice choice-c hs-ro-choice" id="hbc2"></div>
+            <div class="choice choice-d hs-ro-choice" id="hbc3"></div>
+          </div>
+          <div class="hs-wallet-area" id="hs-wallet-area">
+            <div class="hs-wallet-row">🪙 Your coins: <strong id="hs-my-wallet">0</strong></div>
+            <div class="hs-bet-slider-wrap" id="hs-bet-selector" style="display:none;">
+              <div class="hs-bet-slider-row">
+                <span>Wager</span>
+                <input type="range" id="hs-bet-slider" min="1" max="10" value="5"
+                       oninput="Multiplayer.hsUpdateBetSlider(+this.value)">
+                <span id="hs-bet-pct">5</span>%
+                <span class="hs-bet-coins">= <strong id="hs-bet-preview">0</strong> 🪙</span>
+              </div>
+            </div>
+            <p class="hint-text" id="hs-no-coins-msg" style="display:none;text-align:center;font-size:0.8rem;">You have no coins to wager yet</p>
+          </div>
+          <p class="hs-bet-prompt">Will <span id="hs-bet-seater-name">Player</span> get it right?</p>
+          <div class="hs-bet-buttons" id="hs-bet-buttons">
+            <button class="btn-hs-bet bet-correct" onclick="Multiplayer.submitHsBet(true)">✓ CORRECT</button>
+            <button class="btn-hs-bet bet-wrong" onclick="Multiplayer.submitHsBet(false)">✗ WRONG</button>
+          </div>
+          <div class="hs-bet-placed" id="hs-bet-placed" style="display:none;"></div>
+          <p class="hs-bet-count" id="hs-bet-count">0 bets placed</p>
+        </div>
+
+        <div class="admin-bar" id="hs-host-bar" style="display:none;">
+          <button class="admin-btn" onclick="HostGame.hsForceAdvance()" title="Force Advance">⏭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: HOT SEAT REVEAL ==================== -->
+    <div class="screen" id="screen-hs-reveal">
+      <div class="screen-body" style="padding-top:1rem;">
+        <div class="hs-fire-badge" id="hs-rev-seater-badge">🔥 <span id="hs-rev-seater-name">Player</span></div>
+        <div class="hs-reveal-verdict" id="hs-reveal-verdict"></div>
+        <div class="hs-bet-results" id="hs-bet-results"></div>
+        <p class="hint-text" style="text-align:center;margin-top:1rem;">Next question in <span id="hs-rev-countdown">4</span>s…</p>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: RESULTS ==================== -->
+    <div class="screen" id="screen-results">
+      <div class="results-top">
+        <h2 class="results-title">Game Over!</h2>
+        <p class="results-sub" id="results-sub"></p>
+        <div class="imp-elim-banner" id="results-imp-banner" style="display:none"></div>
+        <div id="results-bowl-banner" style="display:none;"></div>
+      </div>
+      <div class="podium" id="podium"></div>
+      <div class="results-table-wrap">
+        <table class="results-table" id="results-table">
+          <thead>
+            <tr><th>#</th><th>Player</th><th>Score</th><th>Correct</th><th>Accuracy</th><th>Avg Time</th><th>Best Streak</th></tr>
+          </thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+      </div>
+      <div class="results-actions">
+        <button class="btn btn-primary" onclick="App.exportCSV()">📥 CSV</button>
+        <button class="btn btn-secondary" onclick="App.printResults()">🖨️ Print/PDF</button>
+        <button class="btn btn-success" id="results-play-again-btn" onclick="App.restartGame()">🔄 Play Again</button>
+        <button class="btn btn-ghost" onclick="App.goTo('home')">🏠 Home</button>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: HISTORY ==================== -->
+    <div class="screen" id="screen-history">
+      <div class="screen-header">
+        <button class="btn-back" onclick="App.goTo('home')">‹</button>
+        <h2>Hall of Fame 🏆</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body">
+        <div class="shop-tabs">
+          <button class="shop-tab active" id="hof-tab-history" onclick="App.switchHallOfFameTab('history', this)">📜 History</button>
+          <button class="shop-tab" id="hof-tab-leaderboards" onclick="App.switchHallOfFameTab('leaderboards', this)">🏆 Leaderboards</button>
+        </div>
+
+        <div id="hof-panel-history">
+          <div class="filter-bar" id="history-mode-bar">
+            <button class="filter-btn active" onclick="App.filterHistory('all', this)">All</button>
+            <button class="filter-btn" onclick="App.filterHistory('classic', this)">📚 Classic</button>
+            <button class="filter-btn" onclick="App.filterHistory('truefalse', this)">⚡ True/False</button>
+            <button class="filter-btn" onclick="App.filterHistory('scramble', this)">🔤 Scramble</button>
+            <button class="filter-btn" onclick="App.filterHistory('survival', this)">💀 Survival</button>
+            <button class="filter-btn" onclick="App.filterHistory('memory', this)">🧠 Memory</button>
+            <button class="filter-btn" onclick="App.filterHistory('twotruths', this)">🤥 Two Truths</button>
+            <button class="filter-btn" onclick="App.filterHistory('higherlower', this)">📊 Higher/Lower</button>
+            <button class="filter-btn" onclick="App.filterHistory('versefill', this)">📖 Verse Fill</button>
+            <button class="filter-btn" onclick="App.filterHistory('emojiclue', this)">🌊 Emoji Clue</button>
+            <button class="filter-btn" onclick="App.filterHistory('impostor', this)">🕵️ Impostor</button>
+            <button class="filter-btn" onclick="App.filterHistory('draw', this)">🎨 Sketch &amp; Guess</button>
+            <button class="filter-btn" onclick="App.filterHistory('scrab', this)">🕎 Bible Scrabble</button>
+            <button class="filter-btn" onclick="App.filterHistory('wordhunt', this)">🔍 Word Hunt</button>
+            <button class="filter-btn" onclick="App.filterHistory('blitz', this)">⚡ Blitz</button>
+            <button class="filter-btn" onclick="App.filterHistory('bowl', this)">🏆 Bible Bowl</button>
+            <button class="filter-btn" onclick="App.filterHistory('hotseat', this)">🎯 Hot Seat</button>
+          </div>
+          <div class="history-list" id="history-list">
+            <p class="empty-msg">No games yet. Start playing!</p>
+          </div>
+          <button class="btn btn-danger" style="margin-top:1rem" onclick="App.clearHistory()">🗑️ Clear History</button>
+        </div>
+
+        <div id="hof-panel-leaderboards" style="display:none">
+          <p class="hint-text">Lifetime points earned in multiplayer games, by mode. Spending points in the Shop never lowers your rank here.</p>
+          <div class="filter-bar" id="leaderboard-mode-bar">
+            <button class="filter-btn active" data-format="overall" onclick="App.selectLeaderboardMode('overall', this)">🌟 Overall</button>
+            <button class="filter-btn" data-format="classic" onclick="App.selectLeaderboardMode('classic', this)">📚 Classic</button>
+            <button class="filter-btn" data-format="truefalse" onclick="App.selectLeaderboardMode('truefalse', this)">⚡ True/False</button>
+            <button class="filter-btn" data-format="scramble" onclick="App.selectLeaderboardMode('scramble', this)">🔤 Scramble</button>
+            <button class="filter-btn" data-format="survival" onclick="App.selectLeaderboardMode('survival', this)">💀 Survival</button>
+            <button class="filter-btn" data-format="memory" onclick="App.selectLeaderboardMode('memory', this)">🧠 Memory</button>
+            <button class="filter-btn" data-format="twotruths" onclick="App.selectLeaderboardMode('twotruths', this)">🤥 Two Truths</button>
+            <button class="filter-btn" data-format="higherlower" onclick="App.selectLeaderboardMode('higherlower', this)">📊 Higher/Lower</button>
+            <button class="filter-btn" data-format="versefill" onclick="App.selectLeaderboardMode('versefill', this)">📖 Verse Fill</button>
+            <button class="filter-btn" data-format="emojiclue" onclick="App.selectLeaderboardMode('emojiclue', this)">🌊 Emoji Clue</button>
+            <button class="filter-btn" data-format="impostor" onclick="App.selectLeaderboardMode('impostor', this)">🕵️ Word Impostor</button>
+            <button class="filter-btn" data-format="draw" onclick="App.selectLeaderboardMode('draw', this)">🎨 Sketch &amp; Guess</button>
+            <button class="filter-btn" data-format="scrab" onclick="App.selectLeaderboardMode('scrab', this)">🕎 Bible Scrabble</button>
+            <button class="filter-btn" data-format="wordhunt" onclick="App.selectLeaderboardMode('wordhunt', this)">🔍 Word Hunt</button>
+            <button class="filter-btn" data-format="blitz" onclick="App.selectLeaderboardMode('blitz', this)">⚡ Blitz</button>
+            <button class="filter-btn" data-format="bowl" onclick="App.selectLeaderboardMode('bowl', this)">🏆 Bible Bowl</button>
+            <button class="filter-btn" data-format="hotseat" onclick="App.selectLeaderboardMode('hotseat', this)">🎯 Hot Seat</button>
+          </div>
+          <div class="leaderboard-list" id="leaderboard-list">
+            <p class="empty-msg">Loading...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: SETTINGS ==================== -->
+    <div class="screen" id="screen-settings">
+      <div class="screen-header">
+        <button class="btn-back" onclick="App.goTo('home')">‹</button>
+        <h2>Settings ⚙️</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body">
+        <div class="settings-group">
+          <h4>Player Profile</h4>
+          <div class="setting-row">
+            <span>Name &amp; Avatar (used for multiplayer)</span>
+            <button class="btn btn-secondary" onclick="App.goTo('profile')">✏️ Edit Profile</button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <h4>Appearance</h4>
+          <label class="setting-row">
+            <span>Dark Mode</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-dark" onchange="App.setDarkMode(this.checked)">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </label>
+        </div>
+        <div class="settings-group">
+          <h4>Audio</h4>
+          <label class="setting-row">
+            <span>Sound Effects</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-sound" onchange="App.setSoundEnabled(this.checked)" checked>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </label>
+          <div class="setting-row">
+            <span>Volume</span>
+            <input type="range" id="volume-slider" min="0" max="100" value="70"
+              oninput="App.setVolume(this.value)" class="range-input">
+          </div>
+        </div>
+        <div class="settings-group" id="game-options-group">
+          <h4>Game Options <span style="opacity:0.6;font-size:0.8rem;">(Host only)</span></h4>
+          <div class="setting-row" id="game-options-lock-row" style="display:none">
+            <span>Game Options are locked to the host/admin.</span>
+            <button class="btn btn-secondary" onclick="App.unlockGameOptions()">🔒 Unlock</button>
+          </div>
+          <div id="game-options-fields">
+          <label class="setting-row">
+            <span>Shuffle Questions</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-shuffle" checked onchange="App.setSetting('shuffle', this.checked)">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </label>
+          <label class="setting-row">
+            <span>Show Bible Reference</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-refs" checked onchange="App.setSetting('showRefs', this.checked)">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </label>
+          <label class="setting-row">
+            <span>Anti-Cheat Lock</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-anticheat" onchange="App.setSetting('antiCheat', this.checked)">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </label>
+          <div class="setting-row">
+            <span>Questions per Game</span>
+            <select id="q-count-select" class="select-input" onchange="App.setSetting('questionCount', parseInt(this.value))">
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="30">30</option>
+              <option value="50">50 (All)</option>
+            </select>
+          </div>
+          </div>
+        </div>
+        <div class="settings-group">
+          <h4>About</h4>
+          <div class="about-box">
+            <p><strong>Bible Challenge Arena</strong> v2.0</p>
+            <p>200 Bible questions across 4 difficulty levels, plus quizzes by book and category.</p>
+            <p>Host a room and play live with friends over the same WiFi network — no internet required.</p>
+            <p style="margin-top:0.5rem;font-style:italic;">"Study to show thyself approved unto God"<br>— 2 Timothy 2:15</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: MY PROFILE ==================== -->
+    <div class="screen" id="screen-my-profile">
+      <div class="screen-header">
+        <button class="btn-back" onclick="App.goTo('home')">‹</button>
+        <h2>My Profile</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body">
+        <div class="my-profile-card">
+          <div class="my-profile-avatar-wrap" id="my-profile-avatar-wrap"></div>
+          <div class="my-profile-name" id="my-profile-name"></div>
+          <div class="wallet-badge">💰 <span id="my-profile-wallet">0</span> pts</div>
+          <p class="hint-text">Points are earned by playing Host/Join multiplayer games.</p>
+          <div class="my-profile-actions">
+            <button class="btn btn-secondary btn-xl" onclick="App.goTo('profile')">✏️ Edit Profile</button>
+            <button class="btn btn-primary btn-xl" onclick="App.goShop()">🛍️ Shop</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: SHOP ==================== -->
+    <div class="screen" id="screen-shop">
+      <div class="screen-header">
+        <button class="btn-back" onclick="App.goTo('my-profile')">‹</button>
+        <h2>Shop</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body">
+        <div class="wallet-badge">💰 <span id="shop-wallet">0</span> pts</div>
+        <div class="shop-tabs" id="shop-tabs">
+          <button class="shop-tab active" id="shop-tab-effects"      onclick="Shop.setTab('effects')">✨ Effects</button>
+          <button class="shop-tab"        id="shop-tab-borders"      onclick="Shop.setTab('borders')">🖼️ Borders</button>
+          <button class="shop-tab"        id="shop-tab-titles"       onclick="Shop.setTab('titles')">👑 Titles</button>
+          <button class="shop-tab"        id="shop-tab-ncolors"      onclick="Shop.setTab('ncolors')">🎨 Colors</button>
+          <button class="shop-tab"        id="shop-tab-skins"        onclick="Shop.setTab('skins')">🎬 Skins</button>
+          <button class="shop-tab"        id="shop-tab-clue"         onclick="Shop.setTab('clue')">📜 Clue Themes</button>
+          <button class="shop-tab"        id="shop-tab-aborder"      onclick="Shop.setTab('aborder')">🌟 Glow Borders</button>
+          <button class="shop-tab"        id="shop-tab-eframe"       onclick="Shop.setTab('eframe')">😊 Frames</button>
+          <button class="shop-tab"        id="shop-tab-consumables"  onclick="Shop.setTab('consumables')">🚀 Boosters</button>
+        </div>
+        <div class="shop-grid" id="shop-grid"></div>
+      </div>
+    </div>
+
+    <!-- ==================== OVERLAY: PAUSE ==================== -->
+    <div class="overlay" id="overlay-pause" style="display:none">
+      <div class="overlay-card">
+        <div class="overlay-icon">⏸</div>
+        <h2>Game Paused</h2>
+        <p>"Be still, and know that I am God" — Psalm 46:10</p>
+        <button class="btn btn-primary btn-xl" onclick="App.resumeGame()">▶ Resume</button>
+        <button class="btn btn-danger" onclick="App.confirmEndGame()">End Game</button>
+      </div>
+    </div>
+
+    <!-- ==================== OVERLAY: CONFIRM END ==================== -->
+    <div class="overlay" id="overlay-confirm" style="display:none">
+      <div class="overlay-card">
+        <div class="overlay-icon">🚪</div>
+        <h2>End Game?</h2>
+        <p>Your progress will be saved to the Hall of Fame.</p>
+        <button class="btn btn-danger btn-xl" onclick="App.endGame()">Yes, End Game</button>
+        <button class="btn btn-ghost" onclick="App.closeConfirm()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- ==================== OVERLAY: FREEZE TARGET ==================== -->
+    <div class="overlay" id="overlay-freeze-target" style="display:none">
+      <div class="overlay-card">
+        <div class="overlay-icon">❄️</div>
+        <h2>Freeze Who?</h2>
+        <p>Pick a player to freeze for 5 seconds.</p>
+        <div class="freeze-target-list" id="freeze-target-list"></div>
+        <button class="btn btn-ghost" onclick="Multiplayer.closeFreezeTargetPicker()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- ==================== OVERLAY: ACHIEVEMENT ==================== -->
+    <div class="overlay" id="overlay-achievement" style="display:none">
+      <div class="overlay-card achievement-card">
+        <div class="achievement-badge" id="ach-badge">🏅</div>
+        <h2>Achievement Unlocked!</h2>
+        <h3 id="ach-title">Speed Demon</h3>
+        <p id="ach-desc">Answered 5 questions in under 5 seconds each</p>
+        <button class="btn btn-primary" onclick="App.closeAchievement()">Awesome! 🎉</button>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: ADMIN DASHBOARD ==================== -->
+    <div class="screen" id="screen-admin-dash">
+      <div class="screen-header">
+        <button class="btn-back" onclick="AdminDash.close()">‹</button>
+        <h2>🛡️ Admin Panel</h2>
+        <button class="btn-ghost" style="font-size:0.8rem;padding:0.3rem 0.6rem;" onclick="AdminDash.refresh()">↻ Refresh</button>
+      </div>
+      <div class="screen-body">
+        <!-- Stats -->
+        <div class="admin-section-title">Live Overview</div>
+        <div class="admin-dash-stats" id="admin-stats">
+          <div class="admin-stat-card online">
+            <div class="admin-stat-value" id="adm-online">—</div>
+            <div class="admin-stat-label">Online Now</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" id="adm-players">—</div>
+            <div class="admin-stat-label">Total Players</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" id="adm-games">—</div>
+            <div class="admin-stat-label">Games Played</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" id="adm-pts">—</div>
+            <div class="admin-stat-label">Pts Distributed</div>
+          </div>
+        </div>
+        <!-- Player list -->
+        <div class="admin-section-title">Players</div>
+        <input type="search" class="admin-search" id="admin-search" placeholder="🔍 Search players…" oninput="AdminDash.filterPlayers(this.value)">
+        <!-- Date/hour range filter -->
+        <div class="admin-filter-bar" id="admin-filter-bar">
+          <div class="admin-filter-label">📅 Filter by activity &amp; points date range</div>
+          <div class="admin-filter-row">
+            <span class="admin-filter-caption">From</span>
+            <input type="date" class="admin-filter-date" id="admin-filter-from-date">
+            <input type="time" class="admin-filter-time" id="admin-filter-from-time" value="00:00">
+          </div>
+          <div class="admin-filter-row">
+            <span class="admin-filter-caption">To</span>
+            <input type="date" class="admin-filter-date" id="admin-filter-to-date">
+            <input type="time" class="admin-filter-time" id="admin-filter-to-time" value="23:59">
+          </div>
+          <div class="admin-filter-actions">
+            <button class="btn btn-primary" style="font-size:0.82rem;padding:0.45rem 1rem;" onclick="AdminDash.applyDateFilter()">Apply Filter</button>
+            <button class="btn btn-ghost"   style="font-size:0.82rem;padding:0.45rem 1rem;" onclick="AdminDash.clearDateFilter()">Clear</button>
+          </div>
+          <div class="admin-filter-summary" id="admin-filter-summary" style="display:none"></div>
+        </div>
+        <div class="admin-player-list" id="admin-player-list">
+          <div style="text-align:center;opacity:0.5;padding:2rem;">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Points adjust modal -->
+    <div class="admin-pts-modal" id="admin-pts-modal" style="display:none" onclick="if(event.target===this)AdminDash.closePtsModal()">
+      <div class="admin-pts-card">
+        <h3 id="admin-pts-modal-title">Adjust Points</h3>
+        <p style="margin:0;font-size:0.85rem;opacity:0.65;" id="admin-pts-modal-sub"></p>
+        <input type="number" class="admin-pts-input" id="admin-pts-amount" placeholder="Amount" min="1" value="1000">
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-primary" style="flex:1;background:#2ecc71;border-color:#2ecc71;" onclick="AdminDash.applyPts(1)">+ Add</button>
+          <button class="btn btn-primary" style="flex:1;background:#e74c3c;border-color:#e74c3c;" onclick="AdminDash.applyPts(-1)">− Remove</button>
+        </div>
+        <button class="btn btn-ghost" onclick="AdminDash.closePtsModal()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- ==================== BIBLE: BOOK LIST ==================== -->
+    <div class="screen" id="screen-bible">
+      <div class="screen-header">
+        <button class="btn-back" onclick="BibleReader.backFromBible()">‹</button>
+        <select id="bible-version-select" class="bible-version-select" onchange="BibleReader.setVersion(this.value)" aria-label="Bible version">
+          <option value="kjv">📖 KJV Bible</option>
+          <option value="abhil82">📖 ABHIL82 Hiligaynon</option>
+        </select>
+        <button id="abhil82-dl-btn" class="bible-icon-btn abhil82-dl-btn" onclick="BibleReader.openAbhil82Setup()" title="Download actual ABHIL82 Bible text" style="display:none">⬇</button>
+        <button class="bible-icon-btn" onclick="BibleReader.openSearch()" title="Search">🔍</button>
+      </div>
+      <div class="screen-body">
+        <!-- Continue Reading card -->
+        <div id="bible-last-read" class="bible-continue-card" style="display:none" onclick="BibleReader.continueReading()">
+          <span class="bible-continue-icon">📖</span>
+          <div>
+            <div class="bible-continue-title">Continue Reading</div>
+            <div class="bible-continue-label" id="bible-continue-label">—</div>
+          </div>
+          <span class="bible-book-arrow">›</span>
+        </div>
+        <!-- Book list rendered by JS -->
+        <div id="bible-book-list"><div class="bible-loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ==================== BIBLE: CHAPTER PICKER ==================== -->
+    <div class="screen" id="screen-bible-chapters">
+      <div class="screen-header">
+        <button class="btn-back" onclick="BibleReader.backToBooks()">‹</button>
+        <h2 id="bible-chapters-title">Chapters</h2>
+        <span id="bible-version-title" class="bible-version-badge">📖 KJV Bible</span>
+      </div>
+      <div class="screen-body">
+        <div class="bible-chapter-grid" id="bible-chapter-grid"></div>
+      </div>
+    </div>
+
+    <!-- ==================== BIBLE: READER ==================== -->
+    <div class="screen" id="screen-bible-reader">
+      <div class="screen-header">
+        <button class="btn-back" onclick="BibleReader.backToChapters()">‹</button>
+        <h2 id="bible-reader-title" style="font-size:0.95rem;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Genesis 1</h2>
+        <button class="bible-icon-btn" onclick="BibleReader.openSearch()" title="Search">🔍</button>
+        <button class="bible-bookmark-btn" id="bible-bookmark-btn" onclick="BibleReader.toggleBookmark()" title="Bookmark this chapter">🏷️</button>
+      </div>
+      <!-- Top nav -->
+      <div class="bible-reader-nav">
+        <button class="bible-nav-btn" id="bible-prev-top" onclick="BibleReader.prevChapter()">‹ Prev</button>
+        <span class="bible-nav-label" id="bible-ch-label-top">Chapter 1</span>
+        <button class="bible-nav-btn" id="bible-next-top" onclick="BibleReader.nextChapter()">Next ›</button>
+      </div>
+      <!-- Verse text -->
+      <div class="bible-reader-body" id="bible-reader-body"></div>
+      <!-- Bottom nav -->
+      <div class="bible-reader-nav">
+        <button class="bible-nav-btn" id="bible-prev-bot" onclick="BibleReader.prevChapter()">‹ Prev</button>
+        <span class="bible-nav-label" id="bible-ch-label-bot">Chapter 1</span>
+        <button class="bible-nav-btn" id="bible-next-bot" onclick="BibleReader.nextChapter()">Next ›</button>
+      </div>
+    </div>
+
+    <!-- ==================== BIBLE: SEARCH ==================== -->
+    <div class="screen" id="screen-bible-search">
+      <div class="screen-header">
+        <button class="btn-back" onclick="BibleReader.closeSearch()">‹</button>
+        <h2 id="bible-search-title">🔍 Search KJV</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body" style="display:flex;flex-direction:column;">
+        <div class="bible-search-wrap">
+          <input type="search" id="bible-search-input" class="bible-search-field"
+            placeholder="Search any word or phrase…"
+            oninput="BibleReader.onSearchInput(this.value)"
+            autocomplete="off" autocorrect="off" spellcheck="false">
+        </div>
+        <div id="bible-search-status" class="bible-search-status"></div>
+        <div id="bible-search-results" class="bible-search-results"></div>
+      </div>
+    </div>
+
+    <!-- ==================== ABHIL82 DOWNLOAD MODAL ==================== -->
+    <div id="abhil82-setup-modal" class="abhil82-modal-overlay" style="display:none" role="dialog" aria-modal="true">
+      <div class="abhil82-modal">
+        <div class="abhil82-modal-hdr">
+          <span class="abhil82-modal-icon">📖</span>
+          <h3 class="abhil82-modal-title">Download ABHIL82 Bible</h3>
+          <button class="abhil82-close-btn" onclick="BibleReader.closeAbhil82Setup()" aria-label="Close">✕</button>
+        </div>
+        <div id="abhil82-setup-body" class="abhil82-modal-body">
+          <!-- Injected by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== BIBLE: Highlight color bar (fixed floating) ==================== -->
+    <div id="bible-hl-bar" class="bible-hl-bar" style="display:none">
+      <button class="hl-dot" style="background:#FFD700" onclick="BibleReader.applyHighlight('yellow')" title="Yellow"></button>
+      <button class="hl-dot" style="background:#7FE080" onclick="BibleReader.applyHighlight('green')"  title="Green"></button>
+      <button class="hl-dot" style="background:#7BB8F5" onclick="BibleReader.applyHighlight('blue')"   title="Blue"></button>
+      <button class="hl-dot" style="background:#F5A0D0" onclick="BibleReader.applyHighlight('pink')"   title="Pink"></button>
+      <button class="hl-dot" style="background:#FFB347" onclick="BibleReader.applyHighlight('orange')" title="Orange"></button>
+      <div class="hl-sep"></div>
+      <button class="hl-dot hl-clear" onclick="BibleReader.clearHighlight()" title="Remove highlight">✕</button>
+    </div>
+
+    <!-- ==================== OVERLAY: ADMIN LOGIN ==================== -->
+    <div class="overlay" id="overlay-admin-login" style="display:none">
+      <div class="overlay-card">
+        <div class="overlay-icon">🔒</div>
+        <h2>Admin Access Required</h2>
+        <p>Sign in to host a game or manage the Hall of Fame.</p>
+        <input type="text" id="admin-username-input" class="text-input" placeholder="Username" autocomplete="off" />
+        <input type="password" id="admin-password-input" class="text-input" placeholder="Password" autocomplete="off" />
+        <p class="error-text" id="admin-login-error"></p>
+        <button class="btn btn-primary btn-xl" onclick="Admin.attemptLogin()">Sign In</button>
+        <button class="btn btn-ghost" onclick="Admin.closeLoginOverlay()">Cancel</button>
+      </div>
+    </div>
+
+  </div><!-- #app -->
+
+  <script src="js/questions.js"></script>
+  <script src="js/book_questions.js"></script>
+  <script src="js/twotruths_data.js"></script>
+  <script src="js/higherlower_data.js"></script>
+  <script src="js/versefill_data.js"></script>
+  <script src="js/emojiclue_data.js"></script>
+  <script src="js/impostor_data.js"></script>
+  <script src="js/drawing_words.js"></script>
+  <script src="js/scrabble_words.js"></script>
+  <script src="js/game_instructions.js"></script>
+  <script src="js/question_tracker.js"></script>
+  <script src="js/custom_questions.js"></script>
+  <script src="js/profile.js"></script>
+  <script src="js/shop.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/admin_dashboard.js"></script>
+  <script src="js/bible_reader.js"></script>
+  <script src="js/qrcode.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/multiplayer.js"></script>
+  <script src="js/host.js"></script>
+  <script src="js/join.js"></script>
+</body>
+</html>
