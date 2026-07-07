@@ -28,8 +28,9 @@ const WORDHUNT_ROUND_CATS = [
     3 => ['concept', 'object', 'animal', 'book', 'place', 'character'],
 ];
 
-// Base score by word length (3–9 chars)
-const WORDHUNT_LENGTH_SCORES = [3 => 5, 4 => 8, 5 => 12, 6 => 16, 7 => 22, 8 => 28, 9 => 30];
+// Base score by word length (3–9 chars). Point economy rebalance: 4x'd so
+// a good round's total lands closer to the trivia-family's scale.
+const WORDHUNT_LENGTH_SCORES = [3 => 20, 4 => 32, 5 => 48, 6 => 64, 7 => 88, 8 => 112, 9 => 120];
 
 // Filler letters biased toward common Bible letters
 const WORDHUNT_FILLER = 'AAAEEEIIILNNOOOSSTTTHHRRV';

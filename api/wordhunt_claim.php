@@ -109,12 +109,13 @@ $claimCountStmt = $db->prepare("SELECT COUNT(*) FROM wordhunt_claims WHERE room_
 $claimCountStmt->execute([$code, $round]);
 $claimCount = (int)$claimCountStmt->fetchColumn();
 
+// Point economy rebalance: 4x'd alongside WORDHUNT_LENGTH_SCORES.
 if ($claimCount === 0) {
     $bonus       = '🌅 First Light';
-    $bonusPoints = 20;
+    $bonusPoints = 80;
 } elseif (($now - (int)$room['wordhunt_round_start']) <= 5000) {
     $bonus       = '⚡ Speed Demon';
-    $bonusPoints = 10;
+    $bonusPoints = 40;
 }
 
 $totalScore = $baseScore + $bonusPoints;

@@ -50,6 +50,10 @@ const GameInstructions = (function () {
       title: '🎨 Sketch & Guess',
       text: 'Players take turns drawing, in join order. The drawer picks one of 4 secret words and sketches it while everyone else types guesses. The first 3 correct guessers score points, and the drawer earns a bonus for each. Needs 2+ players.'
     },
+    sketchimp: {
+      title: '🕵️🎨 Sketch Impostor',
+      text: 'Everyone gets the same secret word except 1-2 Impostors, who get a sneaky related word instead - but nobody types a clue. Instead, every player takes a random 15-second turn sketching their word while everyone (host included) watches live. Once all have sketched, discuss the drawings and vote out who you think is the Impostor. The host only ever sees both possible words, never who has which. Needs 3+ players (8+ gets 2 Impostors).'
+    },
     scrab: {
       title: '🕎 Bible Scrabble',
       text: 'Take turns placing Bible words on an 11×11 board — books, characters, places, and concepts all count! Score by letter values and premium squares. Use all 7 tiles for a Miracle Bonus! Needs 2+ players.'
@@ -60,7 +64,7 @@ const GameInstructions = (function () {
     },
     blitz: {
       title: '⚡ Bible Blitz',
-      text: '90 seconds, rapid fire! Questions get harder as time ticks down. First 30s: ⭐ Easy questions worth 50 pts each. 30–60s: 🔥 Medium questions worth 100 pts. Final 30s: 💀 Hard questions worth 200 pts. Highest total score wins!'
+      text: '90 seconds, rapid fire! Questions get harder as time ticks down. First 30s: ⭐ Easy questions worth 150 pts each. 30–60s: 🔥 Medium questions worth 300 pts. Final 30s: 💀 Hard questions worth 500 pts. Highest total score wins!'
     },
     bowl: {
       title: '🏆 Bible Bowl (Teams)',
@@ -68,7 +72,7 @@ const GameInstructions = (function () {
     },
     hotseat: {
       title: '🎯 Hot Seat Challenge',
-      text: 'One player at a time sits in the 🔥 Hot Seat and answers Bible trivia! Everyone else bets Correct or Wrong before they answer. Nail it? Earn regular points. Right bet? +150 pts! Each player takes a turn — who is the ultimate Bible scholar?'
+      text: 'One player at a time sits in the 🔥 Hot Seat and answers Bible trivia! Everyone else bets Correct or Wrong before they answer. Nail it? Earn regular points. Right bet? +600 pts! Each player takes a turn — who is the ultimate Bible scholar?'
     }
   };
 

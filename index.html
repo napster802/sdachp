@@ -153,6 +153,7 @@
               <option value="emojiclue">🌊 Emoji Story Clue</option>
               <option value="impostor">🕵️ Word Impostor</option>
               <option value="draw">🎨 Sketch &amp; Guess</option>
+              <option value="sketchimp">🕵️🎨 Sketch Impostor</option>
               <option value="scrab">🕎 Bible Scrabble</option>
               <option value="wordhunt">🔍 Bible Word Hunt</option>
               <option value="blitz">⚡ Bible Blitz</option>
@@ -223,6 +224,7 @@
           </div>
           <p class="hint-text" id="host-impostor-hint" style="display:none;">🕵️ Word Impostor needs at least 3 players. No timer - rounds advance once everyone has acted.</p>
           <p class="hint-text" id="host-draw-hint" style="display:none;">🎨 Sketch &amp; Guess needs at least 2 players. Each player takes a turn drawing while everyone else guesses.</p>
+          <p class="hint-text" id="host-sketchimp-hint" style="display:none;">🕵️🎨 Sketch Impostor needs at least 3 players. Everyone sketches their secret word in turn (15s each), then vote out the Impostor. As host, you'll only see both possible words — never who has which.</p>
           <p class="hint-text" id="host-scrab-hint" style="display:none;">🕎 Bible Scrabble needs at least 2 players. Take turns placing Bible words on the 11×11 board for points!</p>
           <div id="host-scrab-time-row" style="display:none">
             <label>Turn timer:
@@ -253,7 +255,7 @@
           </div>
           <p class="hint-text" id="host-blitz-hint" style="display:none;">⚡ 90-second rapid fire! Answer as many True/False Bible questions as possible — your own pace, your own questions, 3× bonus in the first 30 seconds!</p>
           <div id="host-hotseat-panel" style="display:none;">
-            <p class="hint-text">🎯 Hot Seat — 2+ players. Each player takes a turn answering while everyone else bets Correct or Wrong! Bettors earn 150 pts for a right bet.</p>
+            <p class="hint-text">🎯 Hot Seat — 2+ players. Each player takes a turn answering while everyone else bets Correct or Wrong! Bettors earn 600 pts for a right bet.</p>
             <div class="setting-row">
               <span>Questions per Seater</span>
               <select class="select-input" onchange="HostGame.setHsQCount(+this.value)">
@@ -652,6 +654,7 @@
       </div>
       <div class="screen-body">
         <div class="imp-clue-list" id="imp-vote-clue-list"></div>
+        <div class="sketchimp-gallery" id="imp-vote-sketch-gallery" style="display:none"></div>
         <div class="imp-voted-avatars" id="imp-vote-voted-avatars"></div>
         <div class="eliminated-banner" id="imp-vote-eliminated-banner" style="display:none">💀 You're eliminated — spectating the rest of the game</div>
         <div class="imp-vote-list" id="imp-vote-list"></div>
@@ -697,6 +700,35 @@
       </div>
     </div>
 
+    <!-- ==================== SCREEN: SKETCH IMPOSTOR - COOLDOWN ==================== -->
+    <div class="screen" id="screen-sketchimp-cooldown">
+      <div class="screen-header">
+        <h2>🕵️🎨 Sketch Impostor</h2>
+      </div>
+      <div class="screen-body">
+        <p class="hint-text" id="sketchimp-cooldown-turn-label"></p>
+        <div class="imp-word-card">
+          <p class="hint-text">Up Next</p>
+          <div class="imp-word" id="sketchimp-cooldown-next-name">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: SKETCH IMPOSTOR - GALLERY REVEAL ==================== -->
+    <div class="screen" id="screen-sketchimp-reveal">
+      <div class="screen-header">
+        <h2>🖼️ Sketch Gallery</h2>
+      </div>
+      <div class="screen-body">
+        <p class="hint-text">Everyone has sketched their word. Discuss out loud, then the host opens voting.</p>
+        <div class="sketchimp-gallery" id="sketchimp-gallery-grid"></div>
+        <div id="sketchimp-reveal-host-controls" style="display:none">
+          <button class="btn btn-primary btn-xl" onclick="HostGame.startImpostorVoting()">🗳️ Start Voting →</button>
+        </div>
+        <p class="hint-text" id="sketchimp-reveal-waiting-text" style="display:none">Waiting for the host to open voting…</p>
+      </div>
+    </div>
+
     <!-- ==================== SCREEN: SKETCH & GUESS - CHOOSE WORD ==================== -->
     <div class="screen" id="screen-draw-choose">
       <div class="screen-header">
@@ -718,13 +750,24 @@
       </div>
     </div>
 
-    <!-- ==================== SCREEN: SKETCH & GUESS - DRAWING ==================== -->
+    <!-- ==================== SCREEN: SKETCH & GUESS / SKETCH IMPOSTOR - DRAWING ==================== -->
+    <!-- Reused as-is for Sketch Impostor's turn-by-turn sketch phase (status
+         sketchimp_draw) - same canvas + pointer handling, just with the
+         guess form / word-choice bits swapped out for the sketchimp-only
+         elements below. See enterSketchimpDraw() in multiplayer.js. -->
     <div class="screen" id="screen-draw-active">
       <div class="screen-header">
         <h2 id="draw-active-title">🎨 Sketch &amp; Guess</h2>
         <span class="mp-status-badge" id="draw-active-turn-badge"></span>
       </div>
       <div class="screen-body">
+        <div class="imp-word-card" id="sketchimp-my-word-card" style="display:none">
+          <p class="hint-text">Your Secret Word — Sketch It!</p>
+          <div class="imp-word" id="sketchimp-my-word">—</div>
+          <div class="imp-role-badge" id="sketchimp-my-role-badge"></div>
+        </div>
+        <p class="hint-text" id="sketchimp-host-words" style="display:none"></p>
+        <p class="hint-text" id="sketchimp-turn-info" style="display:none"></p>
         <div class="draw-color-picker" id="draw-color-picker" style="display:none">
           <label for="draw-color-input">🎨 Pen color:</label>
           <input type="color" id="draw-color-input" value="#1a1a1a">
@@ -1068,6 +1111,7 @@
             <button class="filter-btn" onclick="App.filterHistory('emojiclue', this)">🌊 Emoji Clue</button>
             <button class="filter-btn" onclick="App.filterHistory('impostor', this)">🕵️ Impostor</button>
             <button class="filter-btn" onclick="App.filterHistory('draw', this)">🎨 Sketch &amp; Guess</button>
+            <button class="filter-btn" onclick="App.filterHistory('sketchimp', this)">🕵️🎨 Sketch Impostor</button>
             <button class="filter-btn" onclick="App.filterHistory('scrab', this)">🕎 Bible Scrabble</button>
             <button class="filter-btn" onclick="App.filterHistory('wordhunt', this)">🔍 Word Hunt</button>
             <button class="filter-btn" onclick="App.filterHistory('blitz', this)">⚡ Blitz</button>
@@ -1095,6 +1139,7 @@
             <button class="filter-btn" data-format="emojiclue" onclick="App.selectLeaderboardMode('emojiclue', this)">🌊 Emoji Clue</button>
             <button class="filter-btn" data-format="impostor" onclick="App.selectLeaderboardMode('impostor', this)">🕵️ Word Impostor</button>
             <button class="filter-btn" data-format="draw" onclick="App.selectLeaderboardMode('draw', this)">🎨 Sketch &amp; Guess</button>
+            <button class="filter-btn" data-format="sketchimp" onclick="App.selectLeaderboardMode('sketchimp', this)">🕵️🎨 Sketch Impostor</button>
             <button class="filter-btn" data-format="scrab" onclick="App.selectLeaderboardMode('scrab', this)">🕎 Bible Scrabble</button>
             <button class="filter-btn" data-format="wordhunt" onclick="App.selectLeaderboardMode('wordhunt', this)">🔍 Word Hunt</button>
             <button class="filter-btn" data-format="blitz" onclick="App.selectLeaderboardMode('blitz', this)">⚡ Blitz</button>

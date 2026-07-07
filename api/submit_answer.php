@@ -32,11 +32,14 @@ if ($room['status'] === 'blitz_active') {
     $currentBlitzIdx = $playerRow2 ? (int)$playerRow2['blitz_q_idx'] : 0;
     if ($qIdx !== $currentBlitzIdx) jsonOut(['success' => false, 'error' => 'Wrong blitz question index'], 400);
 
+    // Point economy rebalance: scaled ~3x so a fast player's 90-second
+    // sprint pays out closer to what one classic-trivia question already
+    // earns (500-1500+ with streak), instead of being the cheapest format.
     $points = 0;
     if ($isCorrect && $elapsed < 90000) {
-        if ($elapsed < 30000)      $points = 50;   // easy tier
-        elseif ($elapsed < 60000)  $points = 100;  // medium tier
-        else                       $points = 200;  // hard tier
+        if ($elapsed < 30000)      $points = 150;  // easy tier
+        elseif ($elapsed < 60000)  $points = 300;  // medium tier
+        else                       $points = 500;  // hard tier
     }
 
     $newBlitzIdx = $currentBlitzIdx + 1;

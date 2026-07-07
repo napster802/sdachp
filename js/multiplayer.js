@@ -315,6 +315,20 @@ const Multiplayer = (function () {
       if (lastStatus !== 'draw_reveal' || lastDrawRound !== data.room.draw_round) {
         enterDrawReveal(data);
       }
+    } else if (status === 'sketchimp_draw') {
+      if (lastStatus !== 'sketchimp_draw' || lastDrawRound !== data.room.draw_round) {
+        enterSketchimpDraw(data);
+      } else {
+        updateSketchimpDraw(data);
+      }
+    } else if (status === 'sketchimp_cooldown') {
+      if (lastStatus !== 'sketchimp_cooldown' || lastDrawRound !== data.room.draw_round) {
+        enterSketchimpCooldown(data);
+      }
+    } else if (status === 'sketchimp_reveal') {
+      if (lastStatus !== 'sketchimp_reveal' || lastImpRound !== data.room.impostor_round) {
+        enterSketchimpReveal(data);
+      }
     } else if (status === 'scrab_place') {
       if (lastStatus !== 'scrab_place' || lastScrabRound !== data.scrab_round) {
         enterScrabPlace(data);
@@ -965,7 +979,7 @@ const Multiplayer = (function () {
       const won = reveal.bets.filter(b => b.won);
       const lost = reveal.bets.filter(b => !b.won);
       const wonLines = won.map(b => {
-        const coins = b.bet_amount > 0 ? `+${(b.bet_amount).toLocaleString()} 🪙` : '+150 pts';
+        const coins = b.bet_amount > 0 ? `+${(b.bet_amount).toLocaleString()} 🪙` : '+600 pts';
         return `<span>${escapeHtml(b.name)} <strong>${coins}</strong></span>`;
       });
       const lostLines = lost.map(b => {
@@ -2185,7 +2199,18 @@ const Multiplayer = (function () {
 
   function enterImpVote(data) {
     App.goTo('imp-vote');
-    renderImpClueList('imp-vote-clue-list', data);
+    const isSketchimp = data.room.game_format === 'sketchimp';
+    const clueList = document.getElementById('imp-vote-clue-list');
+    const gallery = document.getElementById('imp-vote-sketch-gallery');
+    if (isSketchimp) {
+      if (clueList) clueList.style.display = 'none';
+      if (gallery) gallery.style.display = '';
+      renderSketchimpGallery('imp-vote-sketch-gallery', data.sketchimp_gallery || []);
+    } else {
+      if (clueList) clueList.style.display = '';
+      if (gallery) gallery.style.display = 'none';
+      renderImpClueList('imp-vote-clue-list', data);
+    }
     renderImpVotedAvatars(data);
 
     const elimBanner = document.getElementById('imp-vote-eliminated-banner');
@@ -2200,7 +2225,8 @@ const Multiplayer = (function () {
       if (submittedText) submittedText.style.display = 'none';
       if (hostMonitor) hostMonitor.style.display = 'block';
       if (statusBadge) statusBadge.style.display = 'none';
-      renderImpHostAnswerKey('imp-vote-answerkey', data);
+      if (isSketchimp) renderSketchimpHostWords('imp-vote-answerkey', data);
+      else renderImpHostAnswerKey('imp-vote-answerkey', data);
       renderImpActedMonitor('imp-vote-host-monitor-list', data, '✓ Vote in');
       updateImpVoteProceedBtn(data);
       return;
@@ -2299,7 +2325,10 @@ const Multiplayer = (function () {
       }
     }
 
-    if (isHost) renderImpHostAnswerKey('imp-elim-answerkey', data);
+    if (isHost) {
+      if (data.room.game_format === 'sketchimp') renderSketchimpHostWords('imp-elim-answerkey', data);
+      else renderImpHostAnswerKey('imp-elim-answerkey', data);
+    }
     if (hostControls) hostControls.style.display = isHost ? 'block' : 'none';
     if (waitingText) waitingText.style.display = isHost ? 'none' : 'block';
     renderImpClassAbilityButtons('elim', data);
@@ -2322,7 +2351,10 @@ const Multiplayer = (function () {
       });
     }
 
-    if (isHost) renderImpHostAnswerKey('imp-tiebreak-answerkey', data);
+    if (isHost) {
+      if (data.room.game_format === 'sketchimp') renderSketchimpHostWords('imp-tiebreak-answerkey', data);
+      else renderImpHostAnswerKey('imp-tiebreak-answerkey', data);
+    }
     if (hostControls) hostControls.style.display = isHost ? 'block' : 'none';
     if (waitingText) waitingText.style.display = isHost ? 'none' : 'block';
   }
@@ -2331,7 +2363,7 @@ const Multiplayer = (function () {
     const banner = document.getElementById('results-imp-banner');
     if (!banner) return;
     const reveals = data.impostor_reveal;
-    if (data.room.game_format !== 'impostor' || !reveals || !reveals.length) {
+    if (!['impostor', 'sketchimp'].includes(data.room.game_format) || !reveals || !reveals.length) {
       banner.style.display = 'none';
       return;
     }
@@ -2368,7 +2400,7 @@ const Multiplayer = (function () {
   }
 
   // ---------------- SKETCH & GUESS ----------------
-  const DRAW_GUESS_POINTS = [300, 200, 100];
+  const DRAW_GUESS_POINTS = [1200, 800, 400];
 
   function drawWordText(idx) {
     const entry = typeof DrawingWords !== 'undefined' ? DrawingWords.WORDS[idx] : null;
@@ -2682,6 +2714,137 @@ const Multiplayer = (function () {
     const waitingText = document.getElementById('draw-reveal-waiting-text');
     if (hostControls) hostControls.style.display = isHost ? 'block' : 'none';
     if (waitingText) waitingText.style.display = isHost ? 'none' : 'block';
+  }
+
+  // ---------------- SKETCH IMPOSTOR ----------------
+  // Reuses the classic Sketch & Guess canvas screen (#screen-draw-active) for
+  // its turn-by-turn sketch phase - same pointer handling and stroke
+  // broadcast, just a different set of visible sub-elements (see the
+  // sketchimp-* elements added to that screen in index.html) since there's
+  // no word choice and no guessing here.
+
+  // Text only, unlike renderImpHostAnswerKey - the host must never see
+  // impostor_crew_list/impostor_impostor_list for this format (those fields
+  // are only ever populated server-side for classic Word Impostor), so the
+  // host stays a neutral moderator who knows both words but not who has which.
+  function renderSketchimpHostWords(elId, data) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const pair = ImpostorData.PAIRS[data.room.impostor_word_pair_idx];
+    const crewWord = pair ? pair.wordA : '—';
+    const impostorWord = pair ? pair.wordB : '—';
+    el.innerHTML = `👥 Crew word: <strong>${escapeHtml(crewWord)}</strong> &nbsp;·&nbsp; 🕵️ Impostor word: <strong>${escapeHtml(impostorWord)}</strong>`;
+  }
+
+  function enterSketchimpDraw(data) {
+    App.goTo('draw-active');
+    lastStrokeId = 0;
+    drawCanDraw = !!data.am_i_sketchimp_drawer;
+    bindDrawCanvasPointerEvents();
+
+    const canvas = document.getElementById('draw-canvas');
+    clearDrawCanvas(canvas);
+    (data.sketchimp_strokes || []).forEach(s => {
+      drawStrokeOnCanvas(canvas, s);
+      lastStrokeId = Math.max(lastStrokeId, s.id);
+    });
+
+    const title = document.getElementById('draw-active-title');
+    const turnBadge = document.getElementById('draw-active-turn-badge');
+    const colorPicker = document.getElementById('draw-color-picker');
+    const guessForm = document.getElementById('draw-guess-form');
+    const hostWord = document.getElementById('draw-active-host-word');
+    const hostMonitor = document.getElementById('draw-active-host-monitor');
+    const correctAvatars = document.getElementById('draw-correct-avatars');
+    const guessLog = document.getElementById('draw-guess-log');
+    const myWordCard = document.getElementById('sketchimp-my-word-card');
+    const hostWords = document.getElementById('sketchimp-host-words');
+    const turnInfo = document.getElementById('sketchimp-turn-info');
+
+    if (title) title.textContent = '🕵️🎨 Sketch Impostor';
+    if (turnBadge) turnBadge.textContent = `Turn ${data.sketchimp_turn_number}/${data.sketchimp_total_turns}`;
+    // None of Sketch & Guess's guessing UI applies here.
+    if (guessForm) guessForm.style.display = 'none';
+    if (hostWord) hostWord.style.display = 'none';
+    if (hostMonitor) hostMonitor.style.display = 'none';
+    if (correctAvatars) correctAvatars.innerHTML = '';
+    if (guessLog) guessLog.innerHTML = '';
+
+    if (data.am_i_sketchimp_drawer) {
+      if (colorPicker) colorPicker.style.display = 'flex';
+      if (myWordCard) {
+        myWordCard.style.display = '';
+        myWordCard.className = 'imp-word-card' + (myEquippedClueTheme ? ' clue-theme-' + myEquippedClueTheme : '');
+      }
+      if (hostWords) hostWords.style.display = 'none';
+      if (turnInfo) turnInfo.style.display = 'none';
+      const wordEl = document.getElementById('sketchimp-my-word');
+      if (wordEl) wordEl.textContent = lookupImpostorWord(data);
+      renderImpRoleBadge('sketchimp-my-role-badge', data);
+    } else {
+      if (colorPicker) colorPicker.style.display = 'none';
+      if (myWordCard) myWordCard.style.display = 'none';
+      if (isHost) {
+        if (hostWords) { hostWords.style.display = 'block'; renderSketchimpHostWords('sketchimp-host-words', data); }
+        if (turnInfo) turnInfo.style.display = 'none';
+      } else {
+        if (hostWords) hostWords.style.display = 'none';
+        if (turnInfo) turnInfo.style.display = 'block';
+      }
+    }
+    updateSketchimpTurnInfo(data);
+  }
+
+  function updateSketchimpDraw(data) {
+    const canvas = document.getElementById('draw-canvas');
+    (data.sketchimp_strokes || []).forEach(s => {
+      if (s.id > lastStrokeId) {
+        drawStrokeOnCanvas(canvas, s);
+        lastStrokeId = Math.max(lastStrokeId, s.id);
+      }
+    });
+    updateSketchimpTurnInfo(data);
+  }
+
+  function updateSketchimpTurnInfo(data) {
+    if (isHost || data.am_i_sketchimp_drawer) return;
+    const turnInfo = document.getElementById('sketchimp-turn-info');
+    if (!turnInfo) return;
+    const drawerName = data.sketchimp_drawer ? data.sketchimp_drawer.name : 'someone';
+    const secondsLeft = Math.max(0, 15 - Math.floor((data.sketchimp_elapsed_ms || 0) / 1000));
+    turnInfo.textContent = `✏️ ${drawerName} is sketching… ${secondsLeft}s left`;
+  }
+
+  function enterSketchimpCooldown(data) {
+    App.goTo('sketchimp-cooldown');
+    const label = document.getElementById('sketchimp-cooldown-turn-label');
+    const nextName = document.getElementById('sketchimp-cooldown-next-name');
+    if (label) label.textContent = `Turn ${data.sketchimp_turn_number}/${data.sketchimp_total_turns}`;
+    if (nextName) nextName.textContent = data.sketchimp_drawer ? data.sketchimp_drawer.name : '—';
+  }
+
+  function enterSketchimpReveal(data) {
+    App.goTo('sketchimp-reveal');
+    renderSketchimpGallery('sketchimp-gallery-grid', data.sketchimp_gallery || []);
+    const hostControls = document.getElementById('sketchimp-reveal-host-controls');
+    const waitingText = document.getElementById('sketchimp-reveal-waiting-text');
+    if (hostControls) hostControls.style.display = isHost ? 'block' : 'none';
+    if (waitingText) waitingText.style.display = isHost ? 'none' : 'block';
+  }
+
+  function renderSketchimpGallery(containerId, gallery) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = gallery.map((entry, i) => `
+      <div class="sketchimp-gallery-card">
+        <div class="sketchimp-gallery-canvas-wrap"><canvas id="sketchimp-gallery-canvas-${i}" width="300" height="300"></canvas></div>
+        <div class="sketchimp-gallery-name">${avatarHtmlFor(entry)}<span>${escapeHtml(entry.name)}</span></div>
+      </div>
+    `).join('') || '<p class="hint-text">No sketches this round.</p>';
+    gallery.forEach((entry, i) => {
+      const canvas = document.getElementById(`sketchimp-gallery-canvas-${i}`);
+      (entry.strokes || []).forEach(s => drawStrokeOnCanvas(canvas, s));
+    });
   }
 
   function lookupQuestion(qInfo) {
@@ -3192,6 +3355,8 @@ const Multiplayer = (function () {
     try {
       if (currentGameFormat === 'impostor') {
         document.getElementById('results-sub').textContent = `🕵️ Word Impostor • ${data.room.impostor_round} Round${data.room.impostor_round > 1 ? 's' : ''} • Multiplayer`;
+      } else if (currentGameFormat === 'sketchimp') {
+        document.getElementById('results-sub').textContent = `🕵️🎨 Sketch Impostor • ${data.room.impostor_round} Round${data.room.impostor_round > 1 ? 's' : ''} • Multiplayer`;
       } else if (currentGameFormat === 'draw') {
         document.getElementById('results-sub').textContent = `🎨 Sketch & Guess • ${data.room.draw_round} Turn${data.room.draw_round > 1 ? 's' : ''} • Multiplayer`;
       } else if (currentGameFormat === 'scrab') {

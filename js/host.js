@@ -267,7 +267,7 @@ const HostGame = (function () {
   }
 
   function setGameFormat(format) {
-    gameFormat = ['truefalse', 'scramble', 'survival', 'memory', 'twotruths', 'higherlower', 'versefill', 'emojiclue', 'impostor', 'draw', 'scrab', 'wordhunt', 'blitz', 'bowl', 'hotseat'].includes(format) ? format : 'classic';
+    gameFormat = ['truefalse', 'scramble', 'survival', 'memory', 'twotruths', 'higherlower', 'versefill', 'emojiclue', 'impostor', 'draw', 'sketchimp', 'scrab', 'wordhunt', 'blitz', 'bowl', 'hotseat'].includes(format) ? format : 'classic';
     if (typeof GameInstructions !== 'undefined') GameInstructions.render(gameFormat, 'host-instructions-box');
     toggleLobbySettingsForFormat();
     action('set_game_format', { value: gameFormat });
@@ -279,17 +279,19 @@ const HostGame = (function () {
   function toggleLobbySettingsForFormat() {
     const isImpostor  = gameFormat === 'impostor';
     const isDraw      = gameFormat === 'draw';
+    const isSketchimp = gameFormat === 'sketchimp';
     const isScrab     = gameFormat === 'scrab';
     const isWordhunt  = gameFormat === 'wordhunt';
     const isBlitz     = gameFormat === 'blitz';
     const isBowl      = gameFormat === 'bowl';
     const isHotseat   = gameFormat === 'hotseat';
-    const noTrivia    = isImpostor || isDraw || isScrab || isWordhunt || isBlitz;
+    const noTrivia    = isImpostor || isDraw || isSketchimp || isScrab || isWordhunt || isBlitz;
     const triviaSettings = document.getElementById('host-trivia-settings');
     const csvBox         = document.getElementById('host-csv-upload-box');
     const impHint        = document.getElementById('host-impostor-hint');
     const drawHint       = document.getElementById('host-draw-hint');
     const drawRoundsRow  = document.getElementById('host-draw-rounds-row');
+    const sketchimpHint  = document.getElementById('host-sketchimp-hint');
     const scrabHint      = document.getElementById('host-scrab-hint');
     const scrabTimeRow   = document.getElementById('host-scrab-time-row');
     const whHint         = document.getElementById('host-wordhunt-hint');
@@ -303,6 +305,7 @@ const HostGame = (function () {
     if (impHint)        impHint.style.display        = isImpostor ? '' : 'none';
     if (drawHint)       drawHint.style.display       = isDraw ? '' : 'none';
     if (drawRoundsRow)  drawRoundsRow.style.display  = isDraw ? '' : 'none';
+    if (sketchimpHint)  sketchimpHint.style.display  = isSketchimp ? '' : 'none';
     if (scrabHint)      scrabHint.style.display      = isScrab ? '' : 'none';
     if (scrabTimeRow)   scrabTimeRow.style.display   = isScrab ? '' : 'none';
     if (whHint)         whHint.style.display         = isWordhunt ? '' : 'none';
@@ -417,10 +420,10 @@ const HostGame = (function () {
   }
 
   function startGame() {
-    // Word Impostor and Sketch & Guess have no question pool to track
-    // "already played" against, so they skip straight past the
-    // CSV-ready/exclude-indices dance entirely.
-    if (gameFormat === 'impostor' || gameFormat === 'draw') {
+    // Word Impostor, Sketch & Guess, and Sketch Impostor have no question
+    // pool to track "already played" against, so they skip straight past
+    // the CSV-ready/exclude-indices dance entirely.
+    if (gameFormat === 'impostor' || gameFormat === 'draw' || gameFormat === 'sketchimp') {
       action('start_game', {}).then(res => {
         if (!res.success) App.showToast(res.error || 'Could not start game', 'error', 5000);
       });

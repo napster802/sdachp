@@ -137,6 +137,37 @@ if ($status === 'draw_active') {
     }
 }
 
+// === AUTO-ADVANCE: sketchimp_draw -> sketchimp_cooldown/sketchimp_reveal ===
+// Unlike Word Impostor's clue phase (which waits on every player), each
+// sketch turn is strictly time-boxed - 15s to draw, then a 2s cooldown
+// before the next random player's turn, with no host intervention needed
+// either way.
+const SKETCHIMP_DRAW_TIME_LIMIT_MS = 15000;
+const SKETCHIMP_COOLDOWN_MS = 2000;
+if ($status === 'sketchimp_draw') {
+    $sketchimpElapsed = $now - (int)$room['draw_round_start_time'];
+    if ($sketchimpElapsed >= SKETCHIMP_DRAW_TIME_LIMIT_MS) {
+        $turnOrder = drawTurnOrderOf($room);
+        $nextTurn = (int)$room['draw_round'] + 1;
+        if (empty($turnOrder) || $nextTurn > count($turnOrder)) {
+            $db->prepare("UPDATE rooms SET status = 'sketchimp_reveal', updated_at = ? WHERE code = ?")->execute([$now, $code]);
+            $status = 'sketchimp_reveal';
+        } else {
+            $db->prepare("UPDATE rooms SET status = 'sketchimp_cooldown', draw_round = ?, updated_at = ? WHERE code = ?")->execute([$nextTurn, $now, $code]);
+            $status = 'sketchimp_cooldown';
+        }
+    }
+}
+
+// === AUTO-ADVANCE: sketchimp_cooldown -> sketchimp_draw (next player's turn) ===
+if ($status === 'sketchimp_cooldown') {
+    $cooldownElapsed = $now - (int)$room['updated_at'];
+    if ($cooldownElapsed >= SKETCHIMP_COOLDOWN_MS) {
+        $db->prepare("UPDATE rooms SET status = 'sketchimp_draw', draw_round_start_time = ?, updated_at = ? WHERE code = ?")->execute([$now, $now, $code]);
+        $status = 'sketchimp_draw';
+    }
+}
+
 // === AUTO-ADVANCE: blitz_active -> finished (Bible Blitz, 90s timer) ===
 if ($status === 'blitz_active') {
     $blitzElapsed = $now - (int)$room['blitz_start_time'];
@@ -205,8 +236,10 @@ function hsAwardBettors(PDO $db, string $code, array $room): void {
                 $db->prepare("UPDATE profiles SET wallet = wallet + ? WHERE device_id = ?")
                    ->execute([2 * $betAmt, $bet['bettor_id']]);
             }
-            // In-game pts: use bet amount if coins were wagered, else flat 150
-            $ptsEarned = $betAmt > 0 ? $betAmt : 150;
+            // In-game pts: use bet amount if coins were wagered, else a flat
+            // fallback (4x'd in the point economy rebalance alongside
+            // Scrabble/Word Hunt/Sketch & Guess).
+            $ptsEarned = $betAmt > 0 ? $betAmt : 600;
             $db->prepare("UPDATE players SET score = score + ?, correct_count = correct_count + 1 WHERE room_code = ? AND device_id = ?")
                ->execute([$ptsEarned, $code, $bet['bettor_id']]);
         }
@@ -533,11 +566,16 @@ $impSpotlightId = null;
 $impPlayerClasses = null;
 $myImpScribeWord = null;
 
-if ($room['game_format'] === 'impostor') {
+// Sketch Impostor shares this whole block with Word Impostor (role, vote
+// tally, elimination result, end-game reveal) - only the host's who's-who
+// breakdown just below stays Word-Impostor-only, since Sketch Impostor's
+// host is meant to stay a neutral moderator who only knows both possible
+// words, never which player has which.
+if (in_array($room['game_format'], ['impostor', 'sketchimp'], true)) {
     $impostorIds = impostorIdsOf($room);
     $amIImpostor = in_array($deviceId, $impostorIds, true);
 
-    if ($isHost) {
+    if ($isHost && $room['game_format'] === 'impostor') {
         $impostorCrewList = [];
         $impostorImpostorList = [];
         foreach ($playersOut as $p) {
@@ -785,6 +823,86 @@ if ($room['game_format'] === 'draw') {
             'color'      => $s['color'],
             'line_width' => (int)$s['line_width']
         ], $strokeStmt->fetchAll());
+    }
+}
+
+// === SKETCH IMPOSTOR: turn-by-turn sketching + post-sketch gallery ===
+$sketchimpDrawer      = null;
+$amISketchimpDrawer   = false;
+$sketchimpTurnNumber  = 0;
+$sketchimpTotalTurns  = 0;
+$sketchimpElapsedMs   = 0;
+$sketchimpStrokes     = [];
+$sketchimpGallery     = null;
+
+if ($room['game_format'] === 'sketchimp') {
+    $skTurnOrder = drawTurnOrderOf($room);
+    $skDrawerId  = currentDrawerId($room);
+    $amISketchimpDrawer = $skDrawerId !== null && $skDrawerId === $deviceId;
+    $sketchimpTurnNumber = (int)$room['draw_round'];
+    $sketchimpTotalTurns = count($skTurnOrder);
+
+    if ($skDrawerId) {
+        foreach ($playersOut as $p) {
+            if ($p['device_id'] === $skDrawerId) {
+                $sketchimpDrawer = ['device_id' => $p['device_id'], 'name' => $p['name'], 'avatar' => $p['avatar']];
+                break;
+            }
+        }
+    }
+
+    if ($status === 'sketchimp_draw') {
+        $sketchimpElapsedMs = max(0, $now - (int)$room['draw_round_start_time']);
+        // The current drawer's own word text isn't sent here - the client
+        // already resolves it the same way imp_clue does, from the already-
+        // present am_i_impostor + impostor_word_pair_idx fields.
+
+        $skStorageRound = sketchimpStrokeRound($room);
+        if ($sinceStrokeId > 0) {
+            $skStrokeStmt = $db->prepare("SELECT * FROM drawing_strokes WHERE room_code = ? AND round = ? AND id > ? ORDER BY id ASC LIMIT 200");
+            $skStrokeStmt->execute([$code, $skStorageRound, $sinceStrokeId]);
+        } else {
+            $skStrokeStmt = $db->prepare("SELECT * FROM drawing_strokes WHERE room_code = ? AND round = ? ORDER BY id ASC LIMIT 500");
+            $skStrokeStmt->execute([$code, $skStorageRound]);
+        }
+        $sketchimpStrokes = array_map(fn($s) => [
+            'id'         => (int)$s['id'],
+            'points'     => json_decode($s['points'], true) ?: [],
+            'color'      => $s['color'],
+            'line_width' => (int)$s['line_width']
+        ], $skStrokeStmt->fetchAll());
+    }
+
+    // Once the sketch cycle is over, everyone (host included) gets the full
+    // gallery - one canvas replay per player, in the order they drew - to
+    // review before/while voting. draw_turn_order still reflects the cycle
+    // that just finished (it's only overwritten at the start of the next one).
+    if (in_array($status, ['sketchimp_reveal', 'imp_vote', 'imp_tiebreak', 'imp_elim', 'finished'], true) && !empty($skTurnOrder)) {
+        $impRoundForGallery = (int)$room['impostor_round'];
+        $rangeLo = $impRoundForGallery * 1000 + 1;
+        $rangeHi = $impRoundForGallery * 1000 + count($skTurnOrder);
+        $galleryStmt = $db->prepare("SELECT * FROM drawing_strokes WHERE room_code = ? AND round >= ? AND round <= ? ORDER BY id ASC");
+        $galleryStmt->execute([$code, $rangeLo, $rangeHi]);
+        $strokesByDrawer = [];
+        foreach ($galleryStmt->fetchAll() as $s) {
+            $strokesByDrawer[$s['drawer_device_id']][] = [
+                'points'     => json_decode($s['points'], true) ?: [],
+                'color'      => $s['color'],
+                'line_width' => (int)$s['line_width']
+            ];
+        }
+        $sketchimpGallery = [];
+        foreach ($skTurnOrder as $pid) {
+            $pInfo = null;
+            foreach ($playersOut as $p) { if ($p['device_id'] === $pid) { $pInfo = $p; break; } }
+            if (!$pInfo) continue;
+            $sketchimpGallery[] = [
+                'device_id' => $pid,
+                'name'      => $pInfo['name'],
+                'avatar'    => $pInfo['avatar'],
+                'strokes'   => $strokesByDrawer[$pid] ?? [],
+            ];
+        }
     }
 }
 
@@ -1171,6 +1289,13 @@ jsonOut([
     'draw_turn_number'      => $drawTurnNumber,
     'draw_total_turns'      => $drawTotalTurns,
     'draw_strokes'          => $drawStrokes,
+    'sketchimp_drawer'         => $sketchimpDrawer,
+    'am_i_sketchimp_drawer'    => $amISketchimpDrawer,
+    'sketchimp_turn_number'    => $sketchimpTurnNumber,
+    'sketchimp_total_turns'    => $sketchimpTotalTurns,
+    'sketchimp_elapsed_ms'     => $sketchimpElapsedMs,
+    'sketchimp_strokes'        => $sketchimpStrokes,
+    'sketchimp_gallery'        => $sketchimpGallery,
     'scrab_board'              => $scrabBoard,
     'my_scrab_rack'            => $myScrabRack,
     'scrab_current_player'     => $scrabCurrentPlayer,

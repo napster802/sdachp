@@ -458,9 +458,15 @@ function getTimeLimitForDifficulty(string $diff): int {
    advance) call into this same elimination logic so a round only
    ever ends one way, however it got triggered.
    ------------------------------------------------------------ */
-const IMPOSTOR_CREW_WIN_POINTS = 100;
-const IMPOSTOR_VOTE_BONUS = 50;
-const IMPOSTOR_WIN_POINTS = 250;
+// Point economy rebalance: a full Word/Sketch Impostor game can run several
+// clue-or-sketch + vote rounds over many minutes, but used to pay out only
+// 100-250 total - a small fraction of what a single 30-second trivia
+// question earns (500-1500+ with streak). Scaled up roughly 8x so a win
+// is worth an amount of time actually invested, without changing the
+// well-tuned trivia-family scoring formula in submit_answer.php.
+const IMPOSTOR_CREW_WIN_POINTS = 800;
+const IMPOSTOR_VOTE_BONUS = 400;
+const IMPOSTOR_WIN_POINTS = 2000;
 
 function impostorAliveContestants(PDO $db, string $code): array {
     $stmt = $db->prepare("SELECT device_id FROM players WHERE room_code = ? AND is_host = 0 AND eliminated = 0");
@@ -609,8 +615,11 @@ function resolveImpostorVotes(PDO $db, string $code, int $round): void {
    the word index is never secret in a way that matters since the
    full word bank ships to every client regardless of role.
    ------------------------------------------------------------ */
-const DRAW_GUESS_POINTS = [300, 200, 100]; // rank 1/2/3; rank 4+ gets nothing
-const DRAW_DRAWER_BONUS = 50; // per correct guesser, capped at the first 3
+// Point economy rebalance: scaled 4x alongside Bible Scrabble/Word Hunt/Hot
+// Seat's flat bettor payout, bringing a well-played round's total closer to
+// the trivia-family's few-thousand-point scale instead of a few hundred.
+const DRAW_GUESS_POINTS = [1200, 800, 400]; // rank 1/2/3; rank 4+ gets nothing
+const DRAW_DRAWER_BONUS = 200; // per correct guesser, capped at the first 3
 const DRAW_ROUND_TIME_LIMIT = 75; // seconds for draw_active before auto-reveal
 
 function drawTurnOrderOf(array $room): array {
@@ -622,6 +631,15 @@ function currentDrawerId(array $room): ?string {
     if (empty($order)) return null;
     $idx = ((int)$room['draw_round'] - 1) % count($order);
     return $order[$idx];
+}
+
+// Sketch Impostor namespaces drawing_strokes by elimination round: draw_round
+// resets to 1 at the start of every fresh sketch cycle (see host_action.php's
+// impostor_next_round), so without this, turn 1 of round 2 would collide
+// with turn 1 of round 1 in the strokes table. impostor_round stays well
+// under 1000 for any realistic game, so this encoding is always unambiguous.
+function sketchimpStrokeRound(array $room): int {
+    return ((int)$room['impostor_round']) * 1000 + (int)$room['draw_round'];
 }
 
 // Ends the current drawing round (called once draw_active should advance to

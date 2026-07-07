@@ -1393,6 +1393,7 @@ const App = (function () {
       emojiclue:   '🌊 Emoji Clue',
       impostor:    '🕵️ Word Impostor',
       draw:        '🎨 Sketch & Guess',
+      sketchimp:   '🕵️🎨 Sketch Impostor',
       scrab:       '🕎 Bible Scrabble',
       wordhunt:    '🔍 Word Hunt',
       blitz:       '⚡ Bible Blitz',

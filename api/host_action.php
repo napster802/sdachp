@@ -150,6 +150,35 @@ switch ($action) {
             break;
         }
 
+        // Sketch Impostor: reuses Word Impostor's role/word-pair assignment
+        // and vote/elimination engine unchanged (imp_vote/imp_tiebreak/imp_elim/
+        // finished), but replaces the text-clue round with a turn-by-turn
+        // sketch round (sketchimp_draw/sketchimp_cooldown/sketchimp_reveal,
+        // handled in room_state.php) where every alive player - crew and
+        // impostor alike - draws their own secret word for everyone to watch.
+        if ($room['game_format'] === 'sketchimp') {
+            $contestantStmt = $db->prepare("SELECT device_id FROM players WHERE room_code = ? AND is_host = 0");
+            $contestantStmt->execute([$code]);
+            $contestants = $contestantStmt->fetchAll(PDO::FETCH_COLUMN);
+            if (count($contestants) < 3) jsonOut(['success' => false, 'error' => 'Need at least 3 players to start Sketch Impostor'], 400);
+
+            $impostorCount = count($contestants) >= 8 ? 2 : 1;
+            $pool = $contestants;
+            $impostorId = $pool[random_int(0, count($pool) - 1)];
+            $pool = array_values(array_diff($pool, [$impostorId]));
+            $impostorId2 = $impostorCount === 2 ? $pool[random_int(0, count($pool) - 1)] : null;
+            $wordPairIdx = random_int(0, 129); // js/impostor_data.js ImpostorData.PAIRS has exactly 130 entries
+
+            $turnOrder = $contestants;
+            shuffle($turnOrder);
+
+            $db->prepare("UPDATE players SET eliminated = 0, imp_class = NULL, imp_class_used = 0 WHERE room_code = ?")->execute([$code]);
+
+            $db->prepare("UPDATE rooms SET status = 'sketchimp_draw', impostor_word_pair_idx = ?, impostor_id = ?, impostor_id_2 = ?, impostor_round = 1, impostor_result = NULL, impostor_last_elim_id = NULL, impostor_last_skipped = 0, impostor_last_phantom = 0, impostor_last_shepherd = 0, impostor_last_healer = 0, imp_shielded_id = NULL, imp_spotlight_id = NULL, imp_nullified_vote_id = NULL, imp_shadow_new_id = NULL, draw_turn_order = ?, draw_round = 1, draw_round_start_time = ?, updated_at = ? WHERE code = ?")
+               ->execute([$wordPairIdx, $impostorId, $impostorId2, json_encode($turnOrder), $now, $now, $code]);
+            break;
+        }
+
         if ($room['game_format'] === 'hotseat') {
             $contestantStmt2 = $db->prepare("SELECT device_id FROM players WHERE room_code = ? AND is_host = 0 ORDER BY joined_at ASC");
             $contestantStmt2->execute([$code]);
@@ -279,7 +308,7 @@ switch ($action) {
     case 'set_game_format':
         if ($room['status'] !== 'lobby') jsonOut(['success' => false, 'error' => 'Game in progress'], 400);
         $value = $input['value'] ?? 'classic';
-        $format = in_array($value, ['classic', 'truefalse', 'scramble', 'survival', 'memory', 'twotruths', 'higherlower', 'versefill', 'emojiclue', 'impostor', 'draw', 'scrab', 'wordhunt', 'blitz', 'bowl', 'hotseat'], true) ? $value : 'classic';
+        $format = in_array($value, ['classic', 'truefalse', 'scramble', 'survival', 'memory', 'twotruths', 'higherlower', 'versefill', 'emojiclue', 'impostor', 'draw', 'sketchimp', 'scrab', 'wordhunt', 'blitz', 'bowl', 'hotseat'], true) ? $value : 'classic';
         $db->prepare("UPDATE rooms SET game_format = ?, updated_at = ? WHERE code = ?")
            ->execute([$format, $now, $code]);
         break;
@@ -341,16 +370,31 @@ switch ($action) {
         break;
 
     // ---- Word Impostor: host-driven transitions (no timer fallback) ----
+    // Sketch Impostor (sketchimp) shares this whole block - its sketch phase
+    // reaches 'sketchimp_reveal' the same way imp_clue reaches 'imp_reveal',
+    // then everything from voting onward is identical for both formats.
     case 'impostor_start_voting':
-        if ($room['status'] !== 'imp_reveal') jsonOut(['success' => false, 'error' => 'Not in reveal state'], 400);
+        if (!in_array($room['status'], ['imp_reveal', 'sketchimp_reveal'], true)) jsonOut(['success' => false, 'error' => 'Not in reveal state'], 400);
         $db->prepare("UPDATE rooms SET status = 'imp_vote', updated_at = ? WHERE code = ?")->execute([$now, $code]);
         break;
 
     case 'impostor_next_round':
         if ($room['status'] !== 'imp_elim') jsonOut(['success' => false, 'error' => 'Not in elimination state'], 400);
         $nextRound = (int)$room['impostor_round'] + 1;
-        $db->prepare("UPDATE rooms SET status = 'imp_clue', impostor_round = ?, imp_shielded_id = NULL, imp_spotlight_id = NULL, imp_nullified_vote_id = NULL, imp_shadow_new_id = NULL, updated_at = ? WHERE code = ?")
-           ->execute([$nextRound, $now, $code]);
+        if ($room['game_format'] === 'sketchimp') {
+            // Fresh sketch cycle for whoever is still alive, instead of classic
+            // Impostor's text-clue round - same shuffled-turn-order idea
+            // start_game used, just re-run each time the game continues.
+            $aliveStmt = $db->prepare("SELECT device_id FROM players WHERE room_code = ? AND is_host = 0 AND eliminated = 0");
+            $aliveStmt->execute([$code]);
+            $aliveIds = $aliveStmt->fetchAll(PDO::FETCH_COLUMN);
+            shuffle($aliveIds);
+            $db->prepare("UPDATE rooms SET status = 'sketchimp_draw', impostor_round = ?, draw_turn_order = ?, draw_round = 1, draw_round_start_time = ?, imp_shielded_id = NULL, imp_spotlight_id = NULL, imp_nullified_vote_id = NULL, imp_shadow_new_id = NULL, updated_at = ? WHERE code = ?")
+               ->execute([$nextRound, json_encode($aliveIds), $now, $now, $code]);
+        } else {
+            $db->prepare("UPDATE rooms SET status = 'imp_clue', impostor_round = ?, imp_shielded_id = NULL, imp_spotlight_id = NULL, imp_nullified_vote_id = NULL, imp_shadow_new_id = NULL, updated_at = ? WHERE code = ?")
+               ->execute([$nextRound, $now, $code]);
+        }
         break;
 
     case 'imp_start_clue_phase':

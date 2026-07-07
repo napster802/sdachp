@@ -3076,6 +3076,44 @@ label,
   justify-content: center;
 }
 
+/* ── Sketch Impostor gallery ──────────────────────────────── */
+.sketchimp-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.6rem;
+  margin: 0.8rem 0;
+}
+
+.sketchimp-gallery-card {
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem;
+  text-align: center;
+}
+
+.sketchimp-gallery-canvas-wrap {
+  background: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sketchimp-gallery-canvas-wrap canvas {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
+}
+
+.sketchimp-gallery-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text2);
+}
+
 /* ── Bible Scrabble ───────────────────────────────────────── */
 .scrab-body {
   display: flex;

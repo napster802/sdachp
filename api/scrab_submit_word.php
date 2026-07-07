@@ -89,19 +89,20 @@ foreach ($wordsFormed as $wc) {
     ];
 }
 
-// Bonus: Miracle (all 7 rack tiles used)
+// Bonus: Miracle (all 7 rack tiles used) - 4x'd with the rest of Scrabble's
+// point economy rebalance (see SCRAB_LETTER_VALUES).
 $bonusName = null;
 $bonusPoints = 0;
 if (count($usedRackIndices) === 7) {
     $bonusName   = 'Miracle Bonus';
-    $bonusPoints = 50;
+    $bonusPoints = 200;
     $totalScore += $bonusPoints;
 }
 // Bonus: Genesis (first word of the game)
 if ($isFirstWord) {
     $bonusName   = $bonusName ? $bonusName . ' + Genesis Bonus' : 'Genesis Bonus';
-    $bonusPoints += 20;
-    $totalScore += 20;
+    $bonusPoints += 80;
+    $totalScore += 80;
 }
 
 // Update board with placed tiles
