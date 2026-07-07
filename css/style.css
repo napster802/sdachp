@@ -4280,6 +4280,29 @@ label,
   margin: 0.25rem 0 0.5rem;
 }
 
+/* ── Admin database tools ────────────────────────────────── */
+.admin-db-tools {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+.admin-db-tools .btn {
+  width: 100%;
+}
+.admin-db-tools-hint {
+  font-size: 0.78rem;
+  opacity: 0.6;
+  margin: 0.6rem 0 0;
+  line-height: 1.4;
+}
+.admin-db-tools-status {
+  font-size: 0.82rem;
+  margin-top: 0.5rem;
+  min-height: 1.2em;
+}
+
 /* ── Admin date/hour filter bar ──────────────────────────── */
 .admin-filter-bar {
   background: rgba(255,255,255,0.04);

@@ -201,5 +201,38 @@ const AdminDash = (function () {
     });
   }
 
-  return { open, close, refresh, filterPlayers, applyDateFilter, clearDateFilter, openPtsModal, closePtsModal, applyPts, confirmDelete };
+  // ── Import / initialize database ─────────────────────────
+  // Used after pointing the app at a fresh, empty MySQL database (e.g. the
+  // old one was deleted): recreates every runtime table, then hits the
+  // Bible reader endpoint for both versions so its one-time auto-seed from
+  // the bundled JSON files runs immediately instead of waiting for the
+  // first player to open the Bible tab.
+  function importDatabase() {
+    const btn    = document.getElementById('admin-import-btn');
+    const status = document.getElementById('admin-import-status');
+    if (btn) btn.disabled = true;
+    if (status) status.textContent = 'Creating tables…';
+
+    api('import_database').then(res => {
+      if (!res.success) throw new Error(res.error || 'Import failed');
+      if (status) status.textContent = `Created ${res.table_count} tables. Seeding KJV Bible text…`;
+      return fetch('api/bible.php?action=books&version=kjv').then(r => r.json());
+    }).then(kjvRes => {
+      if (!kjvRes.success) throw new Error(kjvRes.error || 'KJV seed failed');
+      if (status) status.textContent = 'KJV Bible ready. Seeding ABHIL82 Bible text (this can take a minute)…';
+      return fetch('api/bible.php?action=books&version=abhil82').then(r => r.json());
+    }).then(abhilRes => {
+      if (!abhilRes.success) throw new Error(abhilRes.error || 'ABHIL82 seed failed');
+      if (status) status.textContent = '✅ Import complete: tables created, both Bible versions seeded.';
+      App.showToast('Database imported successfully.', 'success');
+      refresh();
+    }).catch(err => {
+      if (status) status.textContent = '❌ ' + err.message;
+      App.showToast('Import failed: ' + err.message, 'error');
+    }).finally(() => {
+      if (btn) btn.disabled = false;
+    });
+  }
+
+  return { open, close, refresh, filterPlayers, applyDateFilter, clearDateFilter, openPtsModal, closePtsModal, applyPts, confirmDelete, importDatabase };
 })();

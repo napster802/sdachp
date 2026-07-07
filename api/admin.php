@@ -102,5 +102,20 @@ if ($action === 'delete_player') {
     jsonOut(['success' => true]);
 }
 
+// -------------------------------------------------------------- import_database
+// Explicitly (re)creates every runtime table in the current database. getDB()
+// already runs initDB() (CREATE TABLE IF NOT EXISTS for everything) on every
+// connection, so this is normally a no-op safety net - but after pointing the
+// app at a brand-new empty MySQL/MariaDB database (e.g. following a manual
+// backup/restore), this gives the admin a visible, on-demand way to trigger
+// it and confirm every table landed instead of relying on it happening
+// silently behind the next API call.
+if ($action === 'import_database') {
+    initDB($db);
+    $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+    sort($tables);
+    jsonOut(['success' => true, 'tables' => $tables, 'table_count' => count($tables)]);
+}
+
 // ----------------------------------------------------------------- unknown action
 jsonOut(['success' => false, 'error' => 'Unknown action'], 400);

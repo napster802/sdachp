@@ -1342,6 +1342,13 @@
         <button class="btn-ghost" style="font-size:0.8rem;padding:0.3rem 0.6rem;" onclick="AdminDash.refresh()">↻ Refresh</button>
       </div>
       <div class="screen-body">
+        <!-- Database tools -->
+        <div class="admin-section-title">Database Tools</div>
+        <div class="admin-db-tools">
+          <button class="btn btn-primary" id="admin-import-btn" onclick="AdminDash.importDatabase()">⬆️ Import / Initialize Database</button>
+          <p class="admin-db-tools-hint">Run this after pointing the app at a new, empty MySQL database (e.g. following a backup restore). It (re)creates every table and seeds both Bible versions. Existing data is never deleted.</p>
+          <div class="admin-db-tools-status" id="admin-import-status"></div>
+        </div>
         <!-- Stats -->
         <div class="admin-section-title">Live Overview</div>
         <div class="admin-dash-stats" id="admin-stats">
