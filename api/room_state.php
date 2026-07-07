@@ -139,10 +139,10 @@ if ($status === 'draw_active') {
 
 // === AUTO-ADVANCE: sketchimp_draw -> sketchimp_cooldown/sketchimp_reveal ===
 // Unlike Word Impostor's clue phase (which waits on every player), each
-// sketch turn is strictly time-boxed - 15s to draw, then a 2s cooldown
+// sketch turn is strictly time-boxed - 90s to draw, then a 2s cooldown
 // before the next random player's turn, with no host intervention needed
 // either way.
-const SKETCHIMP_DRAW_TIME_LIMIT_MS = 15000;
+const SKETCHIMP_DRAW_TIME_LIMIT_MS = 90000;
 const SKETCHIMP_COOLDOWN_MS = 2000;
 if ($status === 'sketchimp_draw') {
     $sketchimpElapsed = $now - (int)$room['draw_round_start_time'];
@@ -851,19 +851,23 @@ if ($room['game_format'] === 'sketchimp') {
         }
     }
 
-    if ($status === 'sketchimp_draw') {
+    if ($status === 'sketchimp_draw' && $skDrawerId) {
         $sketchimpElapsedMs = max(0, $now - (int)$room['draw_round_start_time']);
         // The current drawer's own word text isn't sent here - the client
         // already resolves it the same way imp_clue does, from the already-
         // present am_i_impostor + impostor_word_pair_idx fields.
 
-        $skStorageRound = sketchimpStrokeRound($room);
+        // Every player's strokes live under the same fixed round now (see
+        // SKETCHIMP_STROKE_ROUND), so drawer_device_id is what scopes this
+        // query to just the current turn's artist - including the strokes
+        // they drew on earlier turns, so their sketch picks up where they
+        // left off instead of starting blank.
         if ($sinceStrokeId > 0) {
-            $skStrokeStmt = $db->prepare("SELECT * FROM drawing_strokes WHERE room_code = ? AND round = ? AND id > ? ORDER BY id ASC LIMIT 200");
-            $skStrokeStmt->execute([$code, $skStorageRound, $sinceStrokeId]);
+            $skStrokeStmt = $db->prepare("SELECT * FROM drawing_strokes WHERE room_code = ? AND round = ? AND drawer_device_id = ? AND id > ? ORDER BY id ASC LIMIT 200");
+            $skStrokeStmt->execute([$code, SKETCHIMP_STROKE_ROUND, $skDrawerId, $sinceStrokeId]);
         } else {
-            $skStrokeStmt = $db->prepare("SELECT * FROM drawing_strokes WHERE room_code = ? AND round = ? ORDER BY id ASC LIMIT 500");
-            $skStrokeStmt->execute([$code, $skStorageRound]);
+            $skStrokeStmt = $db->prepare("SELECT * FROM drawing_strokes WHERE room_code = ? AND round = ? AND drawer_device_id = ? ORDER BY id ASC LIMIT 2000");
+            $skStrokeStmt->execute([$code, SKETCHIMP_STROKE_ROUND, $skDrawerId]);
         }
         $sketchimpStrokes = array_map(fn($s) => [
             'id'         => (int)$s['id'],
@@ -877,12 +881,12 @@ if ($room['game_format'] === 'sketchimp') {
     // gallery - one canvas replay per player, in the order they drew - to
     // review before/while voting. draw_turn_order still reflects the cycle
     // that just finished (it's only overwritten at the start of the next one).
+    // Every player's strokes accumulate under the same fixed round for the
+    // whole game, so this naturally shows each player's full sketch so far,
+    // not just what they added this round.
     if (in_array($status, ['sketchimp_reveal', 'imp_vote', 'imp_tiebreak', 'imp_elim', 'finished'], true) && !empty($skTurnOrder)) {
-        $impRoundForGallery = (int)$room['impostor_round'];
-        $rangeLo = $impRoundForGallery * 1000 + 1;
-        $rangeHi = $impRoundForGallery * 1000 + count($skTurnOrder);
-        $galleryStmt = $db->prepare("SELECT * FROM drawing_strokes WHERE room_code = ? AND round >= ? AND round <= ? ORDER BY id ASC");
-        $galleryStmt->execute([$code, $rangeLo, $rangeHi]);
+        $galleryStmt = $db->prepare("SELECT * FROM drawing_strokes WHERE room_code = ? AND round = ? ORDER BY id ASC");
+        $galleryStmt->execute([$code, SKETCHIMP_STROKE_ROUND]);
         $strokesByDrawer = [];
         foreach ($galleryStmt->fetchAll() as $s) {
             $strokesByDrawer[$s['drawer_device_id']][] = [

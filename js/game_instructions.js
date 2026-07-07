@@ -52,7 +52,7 @@ const GameInstructions = (function () {
     },
     sketchimp: {
       title: '🕵️🎨 Sketch Impostor',
-      text: 'Everyone gets the same secret word except 1-2 Impostors, who get a sneaky related word instead - but nobody types a clue. Instead, every player takes a random 15-second turn sketching their word while everyone (host included) watches live. Once all have sketched, discuss the drawings and vote out who you think is the Impostor. The host only ever sees both possible words, never who has which. Needs 3+ players (8+ gets 2 Impostors).'
+      text: 'Everyone gets the same secret word except 1-2 Impostors, who get a sneaky related word instead - but nobody types a clue. Instead, every player takes a random 90-second turn sketching their word while everyone (host included) watches live, with a countdown timer visible to all. Once all have sketched, discuss the drawings and vote out who you think is the Impostor. If nobody is caught, surviving players pick up their own sketch right where they left off next round - keep drawing until the Impostor is found! The host only ever sees both possible words, never who has which. Needs 3+ players (8+ gets 2 Impostors).'
     },
     scrab: {
       title: '🕎 Bible Scrabble',

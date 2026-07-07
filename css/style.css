@@ -3015,6 +3015,24 @@ label,
   color: var(--bg);
 }
 
+.draw-eraser-btn {
+  height: 2.6rem;
+  padding: 0 0.8rem;
+  border: 2px solid var(--bg3);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.draw-eraser-btn.active {
+  border-color: #e74c3c;
+  background: #e74c3c;
+  color: #fff;
+}
+
 .draw-canvas-wrap {
   background: #fff;
   border-radius: var(--radius);

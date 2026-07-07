@@ -28,11 +28,12 @@ $points = array_slice($points, 0, 500);
 $color = mb_substr($color, 0, 16);
 $lineWidth = max(1, min(40, $lineWidth));
 
-// Sketch Impostor namespaces the stored round by elimination round (see
-// sketchimpStrokeRound()) since draw_round resets to 1 every sketch cycle;
-// classic Sketch & Guess stores the round as-is (draw_round is monotonic
-// for its whole game).
-$storageRound = $room['game_format'] === 'sketchimp' ? sketchimpStrokeRound($room) : $round;
+// Sketch Impostor stores every player's strokes under one fixed round for
+// the whole game (SKETCHIMP_STROKE_ROUND) so their sketch carries over
+// between turns instead of resetting; classic Sketch & Guess stores the
+// round as-is (draw_round is monotonic for its whole game, one drawing per
+// round, never revisited).
+$storageRound = $room['game_format'] === 'sketchimp' ? SKETCHIMP_STROKE_ROUND : $round;
 
 $db->prepare("INSERT INTO drawing_strokes (room_code, round, drawer_device_id, points, color, line_width, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
    ->execute([$code, $storageRound, $deviceId, json_encode($points), $color, $lineWidth, nowMs()]);

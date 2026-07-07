@@ -62,6 +62,8 @@ const Multiplayer = (function () {
   let drawDrawing = false;
   let drawColor = '#1a1a1a';
   let drawLineWidth = 5;
+  let drawEraserMode = false;
+  const DRAW_ERASER_WIDTH_MULT = 6; // eraser strokes are chunkier than the pen for practical erasing
   let answeredThisQuestion = false;
   let lastEventId = 0;
   let lastData = null;
@@ -2416,7 +2418,13 @@ const Multiplayer = (function () {
   function drawStrokeOnCanvas(canvas, stroke) {
     if (!canvas || !stroke.points || stroke.points.length < 2) return;
     const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = stroke.color || '#000000';
+    const isEraser = stroke.color === 'eraser';
+    // Eraser strokes carry no real color - they cut a transparent hole via
+    // destination-out compositing instead of painting over the drawing, so
+    // replaying strokes in order (including interleaved pen/eraser strokes)
+    // reconstructs exactly what erasing while drawing looked like live.
+    ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+    ctx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : (stroke.color || '#000000');
     ctx.lineWidth = stroke.line_width || 4;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -2424,6 +2432,7 @@ const Multiplayer = (function () {
     ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
     for (let i = 1; i < stroke.points.length; i++) ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
     ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   function canvasPointFromEvent(canvas, evt) {
@@ -2452,6 +2461,13 @@ const Multiplayer = (function () {
         document.querySelectorAll('.draw-thickness-btn').forEach(b => b.classList.toggle('active', b === btn));
       });
     });
+    const eraserBtn = document.getElementById('draw-eraser-btn');
+    if (eraserBtn) {
+      eraserBtn.addEventListener('click', () => {
+        drawEraserMode = !drawEraserMode;
+        eraserBtn.classList.toggle('active', drawEraserMode);
+      });
+    }
     if (!canvas) return;
     let currentStroke = null;
 
@@ -2467,14 +2483,16 @@ const Multiplayer = (function () {
       const prev = currentStroke[currentStroke.length - 1];
       currentStroke.push(pt);
       const ctx = canvas.getContext('2d');
-      ctx.strokeStyle = drawColor;
-      ctx.lineWidth = drawLineWidth;
+      ctx.globalCompositeOperation = drawEraserMode ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = drawEraserMode ? 'rgba(0,0,0,1)' : drawColor;
+      ctx.lineWidth = drawEraserMode ? drawLineWidth * DRAW_ERASER_WIDTH_MULT : drawLineWidth;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();
       ctx.moveTo(prev.x, prev.y);
       ctx.lineTo(pt.x, pt.y);
       ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over';
     });
     const finishStroke = () => {
       if (!drawDrawing) return;
@@ -2511,8 +2529,8 @@ const Multiplayer = (function () {
       device_id: deviceId,
       round: lastDrawRound,
       points: points,
-      color: drawColor,
-      line_width: drawLineWidth
+      color: drawEraserMode ? 'eraser' : drawColor,
+      line_width: drawEraserMode ? drawLineWidth * DRAW_ERASER_WIDTH_MULT : drawLineWidth
     }).catch(err => console.error('Stroke submit failed:', err));
   }
 
@@ -2618,11 +2636,20 @@ const Multiplayer = (function () {
     }
   }
 
+  // Every new turn starts in pen mode, regardless of whether the previous
+  // drawer left the eraser toggled on.
+  function resetDrawEraserMode() {
+    drawEraserMode = false;
+    const eraserBtn = document.getElementById('draw-eraser-btn');
+    if (eraserBtn) eraserBtn.classList.remove('active');
+  }
+
   function enterDrawActive(data) {
     App.goTo('draw-active');
     lastStrokeId = 0;
     drawCanDraw = !!data.am_i_drawer;
     bindDrawCanvasPointerEvents();
+    resetDrawEraserMode();
 
     const canvas = document.getElementById('draw-canvas');
     clearDrawCanvas(canvas);
@@ -2741,6 +2768,7 @@ const Multiplayer = (function () {
     lastStrokeId = 0;
     drawCanDraw = !!data.am_i_sketchimp_drawer;
     bindDrawCanvasPointerEvents();
+    resetDrawEraserMode();
 
     const canvas = document.getElementById('draw-canvas');
     clearDrawCanvas(canvas);
@@ -2762,7 +2790,6 @@ const Multiplayer = (function () {
     const turnInfo = document.getElementById('sketchimp-turn-info');
 
     if (title) title.textContent = '🕵️🎨 Sketch Impostor';
-    if (turnBadge) turnBadge.textContent = `Turn ${data.sketchimp_turn_number}/${data.sketchimp_total_turns}`;
     // None of Sketch & Guess's guessing UI applies here.
     if (guessForm) guessForm.style.display = 'none';
     if (hostWord) hostWord.style.display = 'none';
@@ -2786,13 +2813,13 @@ const Multiplayer = (function () {
       if (myWordCard) myWordCard.style.display = 'none';
       if (isHost) {
         if (hostWords) { hostWords.style.display = 'block'; renderSketchimpHostWords('sketchimp-host-words', data); }
-        if (turnInfo) turnInfo.style.display = 'none';
+        if (turnInfo) turnInfo.style.display = 'block';
       } else {
         if (hostWords) hostWords.style.display = 'none';
         if (turnInfo) turnInfo.style.display = 'block';
       }
     }
-    updateSketchimpTurnInfo(data);
+    updateSketchimpTimer(data);
   }
 
   function updateSketchimpDraw(data) {
@@ -2803,16 +2830,29 @@ const Multiplayer = (function () {
         lastStrokeId = Math.max(lastStrokeId, s.id);
       }
     });
-    updateSketchimpTurnInfo(data);
+    updateSketchimpTimer(data);
   }
 
-  function updateSketchimpTurnInfo(data) {
-    if (isHost || data.am_i_sketchimp_drawer) return;
-    const turnInfo = document.getElementById('sketchimp-turn-info');
-    if (!turnInfo) return;
-    const drawerName = data.sketchimp_drawer ? data.sketchimp_drawer.name : 'someone';
-    const secondsLeft = Math.max(0, 15 - Math.floor((data.sketchimp_elapsed_ms || 0) / 1000));
-    turnInfo.textContent = `✏️ ${drawerName} is sketching… ${secondsLeft}s left`;
+  const SKETCHIMP_DRAW_SECONDS = 90;
+
+  // Live countdown visible to everyone regardless of role (drawer, host,
+  // spectators) - shown in the shared turn badge in the screen header, not
+  // gated behind any per-role element.
+  function updateSketchimpTimer(data) {
+    const turnBadge = document.getElementById('draw-active-turn-badge');
+    if (!turnBadge) return;
+    const secondsLeft = Math.max(0, SKETCHIMP_DRAW_SECONDS - Math.floor((data.sketchimp_elapsed_ms || 0) / 1000));
+    turnBadge.textContent = `Turn ${data.sketchimp_turn_number}/${data.sketchimp_total_turns} · ⏱ ${secondsLeft}s`;
+
+    // "PlayerX is sketching…" context text for everyone except the drawer
+    // themselves (host included, so the host always knows whose turn it is).
+    if (!data.am_i_sketchimp_drawer) {
+      const turnInfo = document.getElementById('sketchimp-turn-info');
+      if (turnInfo) {
+        const drawerName = data.sketchimp_drawer ? data.sketchimp_drawer.name : 'someone';
+        turnInfo.textContent = `✏️ ${drawerName} is sketching…`;
+      }
+    }
   }
 
   function enterSketchimpCooldown(data) {

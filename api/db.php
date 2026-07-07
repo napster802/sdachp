@@ -633,14 +633,12 @@ function currentDrawerId(array $room): ?string {
     return $order[$idx];
 }
 
-// Sketch Impostor namespaces drawing_strokes by elimination round: draw_round
-// resets to 1 at the start of every fresh sketch cycle (see host_action.php's
-// impostor_next_round), so without this, turn 1 of round 2 would collide
-// with turn 1 of round 1 in the strokes table. impostor_round stays well
-// under 1000 for any realistic game, so this encoding is always unambiguous.
-function sketchimpStrokeRound(array $room): int {
-    return ((int)$room['impostor_round']) * 1000 + (int)$room['draw_round'];
-}
+// Sketch Impostor stores every player's strokes under this one fixed round
+// for the whole game (rather than a per-turn value) so a player's sketch
+// carries over and keeps growing across every elimination round they get a
+// turn in, instead of starting over each round - drawer_device_id (already
+// stored per stroke) is what disambiguates whose sketch is whose, not round.
+const SKETCHIMP_STROKE_ROUND = 1;
 
 // Ends the current drawing round (called once draw_active should advance to
 // draw_reveal, whether triggered by the timer, by 3 correct guesses already

@@ -224,7 +224,7 @@
           </div>
           <p class="hint-text" id="host-impostor-hint" style="display:none;">🕵️ Word Impostor needs at least 3 players. No timer - rounds advance once everyone has acted.</p>
           <p class="hint-text" id="host-draw-hint" style="display:none;">🎨 Sketch &amp; Guess needs at least 2 players. Each player takes a turn drawing while everyone else guesses.</p>
-          <p class="hint-text" id="host-sketchimp-hint" style="display:none;">🕵️🎨 Sketch Impostor needs at least 3 players. Everyone sketches their secret word in turn (15s each), then vote out the Impostor. As host, you'll only see both possible words — never who has which.</p>
+          <p class="hint-text" id="host-sketchimp-hint" style="display:none;">🕵️🎨 Sketch Impostor needs at least 3 players. Everyone sketches their secret word in turn (90s each, live timer for all), then vote out the Impostor. Survivors continue their own sketch next round instead of starting over. As host, you'll only see both possible words — never who has which.</p>
           <p class="hint-text" id="host-scrab-hint" style="display:none;">🕎 Bible Scrabble needs at least 2 players. Take turns placing Bible words on the 11×11 board for points!</p>
           <div id="host-scrab-time-row" style="display:none">
             <label>Turn timer:
@@ -776,6 +776,7 @@
             <button type="button" class="draw-thickness-btn" data-width="3">3x</button>
             <button type="button" class="draw-thickness-btn active" data-width="5">5x</button>
           </div>
+          <button type="button" class="draw-eraser-btn" id="draw-eraser-btn">🧹 Eraser</button>
         </div>
         <div class="draw-canvas-wrap">
           <canvas id="draw-canvas" width="600" height="600"></canvas>
