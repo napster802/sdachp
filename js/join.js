@@ -20,6 +20,7 @@ const JoinGame = (function () {
     emojiclue:   { icon: '🌊', label: 'Emoji Story Clue' },
     impostor:    { icon: '🕵️', label: 'Word Impostor' },
     draw:        { icon: '🎨', label: 'Sketch & Guess' },
+    sketchimp:   { icon: '🕵️🎨', label: 'Sketch Impostor' },
     scrab:       { icon: '🕎', label: 'Bible Scrabble' },
     wordhunt:    { icon: '🔍', label: 'Bible Word Hunt' },
     blitz:       { icon: '⚡', label: 'Bible Blitz' },
