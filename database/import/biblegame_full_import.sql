@@ -7,13 +7,18 @@
 -- is a clean starting point, not a backup of live data.
 --
 -- HOW TO USE (KSWEB / phpMyAdmin):
---   1. In phpMyAdmin, create an empty database named "biblegame"
---      (or whatever DB_NAME your api/db.php is configured for).
---   2. Select that database, open the "Import" tab.
+--   1. In phpMyAdmin, create an empty database (whatever name your host
+--      gives you, e.g. a shared-hosting account prefix like
+--      "depedca1_biblegame") - this file does not create or select a
+--      database itself, so make sure yours is already selected first.
+--   2. With that database selected, open the "Import" tab.
 --   3. Choose this file and click "Go".
 --   4. All tables + both Bible versions are created in one shot -
 --      no waiting on the app's slower first-run JSON seeding, which
 --      can time out on slower Android/KSWEB hardware.
+--   5. Set DB_NAME (via an environment variable, or in
+--      api/config.local.php) to that same database name so the app
+--      actually connects to it.
 --
 -- Safe to re-run: every CREATE TABLE is preceded by DROP TABLE IF
 -- EXISTS, so importing this again simply resets everything back to
@@ -32,9 +37,6 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-CREATE DATABASE /*!32312 IF NOT EXISTS*/ `biblegame` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
-
-USE `biblegame`;
 DROP TABLE IF EXISTS `answers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
