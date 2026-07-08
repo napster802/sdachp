@@ -26,6 +26,11 @@ const PWA = (function () {
     updateBadge();
     App.showToast('✅ Back online - syncing…', 'success', 2000);
     if (typeof OfflineQueue !== 'undefined') OfflineQueue.flush();
+    // Retry any Bible version that didn't finish downloading while we were
+    // offline (or on a previous visit) - a device that missed the initial
+    // download gets another automatic shot at it here.
+    if (typeof OfflineBible !== 'undefined') OfflineBible.preloadAll();
+    if (typeof BibleReader !== 'undefined' && BibleReader.refreshOfflineStatus) BibleReader.refreshOfflineStatus();
   }
 
   function onOffline() {
@@ -41,9 +46,11 @@ const PWA = (function () {
     // Attempt a flush on load too, in case the queue has leftovers from a
     // previous offline session that closed before ever coming back online.
     if (navigator.onLine && typeof OfflineQueue !== 'undefined') OfflineQueue.flush();
-    // Parse both Bible versions in the background so they're instantly
-    // ready the moment the Bible tab opens, online or not.
-    if (typeof OfflineBible !== 'undefined') OfflineBible.preload();
+    // Download both Bible versions in the background so they're ready the
+    // moment the Bible tab opens, online or not - the visible status row
+    // on the Bible screen (js/bible_reader.js) shows/retries anything that
+    // doesn't finish.
+    if (typeof OfflineBible !== 'undefined') OfflineBible.preloadAll();
   }
 
   return { init, updateBadge };

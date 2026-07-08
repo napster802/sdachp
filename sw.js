@@ -1,28 +1,35 @@
 /* ============================================================
    Bible Challenge Arena - Service Worker
-   Precaches the app shell (all js/css assets index.html loads)
-   plus both full Bible text files, so the app opens and both
-   Bible versions are readable with zero connection. Never
-   intercepts /api/ traffic - this is a real-time multiplayer app,
-   and a stale cached API response would be actively wrong, not
-   just unhelpful.
+   Precaches the app shell (all js/css assets index.html loads),
+   so the app opens with zero connection. Never intercepts /api/
+   traffic - this is a real-time multiplayer app, and a stale
+   cached API response would be actively wrong, not just
+   unhelpful.
+
+   The two full Bible text files are intentionally NOT part of the
+   atomic shell install below - cache.addAll() is all-or-nothing,
+   and bundling two ~4MB fetches in with 31 small JS/CSS files
+   meant a single flaky mobile-network hiccup on either large file
+   could silently fail the ENTIRE install, shell included. They're
+   downloaded separately and best-effort here (a nice-to-have head
+   start) - js/offline_bible.js's download() is the real, retryable,
+   user-visible path that actually guarantees they end up cached
+   (see the "Download for Offline" row on the Bible screen).
 
    CACHE_NAME is tied to index.html's manual css/style.css?v=N
    convention - bump the trailing number in BOTH places together
    whenever any precached file changes, so a deploy doesn't leave
    old JS/CSS/Bible data stuck in a stale cache forever.
    ============================================================ */
-const CACHE_NAME = 'bca-v7';
+const CACHE_NAME = 'bca-v8';
 
-const PRECACHE_URLS = [
+const SHELL_URLS = [
   './',
   'index.html',
   'manifest.json',
-  'css/style.css?v=7',
+  'css/style.css?v=8',
   'images/icon-192.png',
   'images/icon-512.png',
-  'bible/en_kjv.json',
-  'bible/abhil82.json',
   // App shell scripts - keep this in sync with index.html's <script src> list.
   'js/questions.js',
   'js/book_questions.js',
@@ -52,10 +59,15 @@ const PRECACHE_URLS = [
   'js/join.js',
 ];
 
+const BIBLE_URLS = ['bible/en_kjv.json', 'bible/abhil82.json'];
+
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(cache => cache.addAll(SHELL_URLS)
+        // Best-effort only - see the big comment above. Any failure here
+        // must never reject the install; the shell must still activate.
+        .then(() => Promise.allSettled(BIBLE_URLS.map(url => cache.add(url)))))
       .then(() => self.skipWaiting())
   );
 });

@@ -129,6 +129,68 @@ const BibleReader = (function () {
     goTo('screen-bible');
     updateVersionUI();
     renderBookList();
+    refreshOfflineStatus();
+  }
+
+  // ── Offline availability status ("Download for Offline" row) ────────
+  const OFFLINE_VERSIONS = [
+    { key: 'kjv', label: 'KJV Bible' },
+    { key: 'abhil82', label: 'ABHIL82 Hiligaynon' },
+  ];
+
+  function offlineRowHtml(v) {
+    return `
+      <div class="bible-offline-row">
+        <span class="bible-offline-label">📖 ${v.label}</span>
+        <span class="bible-offline-state" id="bible-offline-state-${v.key}">Checking…</span>
+      </div>`;
+  }
+
+  function updateOfflineRow(version, state) {
+    const stateEl = document.getElementById('bible-offline-state-' + version);
+    if (!stateEl) return;
+    if (state === 'ready') {
+      stateEl.innerHTML = '<span class="bible-offline-ready">✅ Ready offline</span>';
+    } else if (state === 'downloading') {
+      stateEl.innerHTML = '<span class="bible-offline-downloading">⏳ Downloading…</span>';
+    } else if (state === 'error') {
+      stateEl.innerHTML = `<button class="bible-offline-btn bible-offline-btn-error" onclick="BibleReader.downloadOffline('${version}')">❌ Failed — tap to retry</button>`;
+    } else if (state === 'idle') {
+      stateEl.innerHTML = `<button class="bible-offline-btn" onclick="BibleReader.downloadOffline('${version}')">⬇️ Download for offline</button>`;
+    } else {
+      stateEl.innerHTML = '<span class="bible-offline-checking">Checking…</span>';
+    }
+  }
+
+  // Checks the REAL persisted state (Cache Storage) for both versions and
+  // renders accurate status - called on entering the Bible screen, and
+  // again by js/pwa.js whenever the connection comes back (so a version
+  // that failed to auto-download gets picked up without the user having
+  // to do anything).
+  async function refreshOfflineStatus() {
+    const box = document.getElementById('bible-offline-status');
+    if (!box || typeof OfflineBible === 'undefined') return;
+    box.innerHTML = OFFLINE_VERSIONS.map(offlineRowHtml).join('');
+    for (const v of OFFLINE_VERSIONS) {
+      try {
+        const ready = await OfflineBible.isDownloaded(v.key);
+        updateOfflineRow(v.key, ready ? 'ready' : 'idle');
+      } catch (e) {
+        updateOfflineRow(v.key, 'idle');
+      }
+    }
+  }
+
+  async function downloadOffline(version) {
+    updateOfflineRow(version, 'downloading');
+    try {
+      await OfflineBible.download(version);
+      updateOfflineRow(version, 'ready');
+      const label = OFFLINE_VERSIONS.find(v => v.key === version)?.label || version;
+      App.showToast(`📖 ${label} ready for offline reading!`, 'success');
+    } catch (e) {
+      updateOfflineRow(version, 'error');
+    }
   }
 
   async function renderBookList() {
@@ -885,5 +947,6 @@ const BibleReader = (function () {
     setVersion,
     openAbhil82Setup, closeAbhil82Setup, testThenStartDownload,
     startAbhil82Download, cancelAbhil82, finalizeAbhil82, resetAbhil82,
+    refreshOfflineStatus, downloadOffline,
   };
 })();

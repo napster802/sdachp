@@ -4491,6 +4491,42 @@ label,
   flex-shrink: 0;
 }
 
+/* ── Offline availability status ─────────────────────────── */
+.bible-offline-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.bible-offline-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--card2);
+  border: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.85rem;
+}
+.bible-offline-label { opacity: 0.9; }
+.bible-offline-ready { color: var(--green); font-weight: 600; }
+.bible-offline-checking, .bible-offline-downloading { opacity: 0.6; }
+.bible-offline-btn {
+  background: transparent;
+  border: 1.5px solid var(--gold);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.bible-offline-btn-error {
+  border-color: var(--red);
+  color: var(--red);
+}
+
 /* ── Continue Reading card ───────────────────────────────── */
 .bible-continue-card {
   display: flex;

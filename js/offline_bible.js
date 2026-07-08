@@ -1,43 +1,90 @@
 /* ============================================================
    Bible Challenge Arena - Offline Bible data
-   Parses the two full Bible JSON files (precached by sw.js at
-   install time - see PRECACHE_URLS) into the same shape
+   Parses the two full Bible JSON files into the same shape
    js/bible_reader.js already expects from api/bible.php, so the
    reader can fall back to this when there is no connection.
    Both files use the same simple shape: an array of 66 books,
    each { name, abbrev, chapters }, where chapters[c] is an array
    of verse strings for chapter c+1 - matches how api/bible.php's
    own PHP-side seeding parses these exact files.
+
+   download() is the one real, retryable path that gets a version
+   durably available offline: it fetches the raw JSON and writes it
+   into the same Cache Storage the service worker uses, independent
+   of whether sw.js's own best-effort install-time attempt
+   succeeded (that one is atomic-shell-safe but best-effort for the
+   large Bible files - see sw.js's comment). Both the automatic
+   background download (js/pwa.js) and the manual "Download for
+   Offline" button (js/bible_reader.js) call this same function, so
+   there is only one download implementation to trust.
    ============================================================ */
 const OfflineBible = (function () {
   const OT_BOOK_COUNT = 39; // matches api/bible.php: ($num <= 39) ? 'OT' : 'NT'
+  const CACHE_NAME = 'bca-v8'; // must match sw.js's CACHE_NAME - same Cache Storage bucket
 
   const fileByVersion = { kjv: 'bible/en_kjv.json', abhil82: 'bible/abhil82.json' };
 
-  const cache = {};   // version -> parsed array
-  const loading = {}; // version -> in-flight promise
+  const cache = {};   // version -> parsed array (this session only)
+  const loading = {}; // version -> in-flight download promise
 
   function stripBom(text) {
     return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
   }
 
+  function parseAndStore(version, text) {
+    const data = JSON.parse(stripBom(text));
+    cache[version] = data;
+    return data;
+  }
+
+  function download(version) {
+    const file = fileByVersion[version] || fileByVersion.kjv;
+    if (loading[version]) return loading[version];
+
+    const p = fetch(file, { cache: 'no-store' }).then(async res => {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const resForCache = res.clone();
+      const text = await res.text();
+      // Persist independently of the service worker's own install-time
+      // attempt - this is what actually guarantees offline availability.
+      if ('caches' in window) {
+        try {
+          const c = await caches.open(CACHE_NAME);
+          await c.put(file, resForCache);
+        } catch (e) {
+          // Cache Storage unavailable/full (private browsing, quota) - the
+          // in-memory copy below still works for the rest of this session.
+        }
+      }
+      return parseAndStore(version, text);
+    });
+    loading[version] = p;
+    // Clear the in-flight flag on either outcome without creating an
+    // unhandled rejection of our own - unlike .finally(), a .then() with
+    // both handlers resolves cleanly either way while still letting the
+    // original rejection (if any) propagate to whoever awaits `p` itself.
+    p.then(() => { loading[version] = null; }, () => { loading[version] = null; });
+    return p;
+  }
+
   function ensureLoaded(version) {
     if (cache[version]) return Promise.resolve(cache[version]);
-    if (loading[version]) return loading[version];
+    return download(version);
+  }
+
+  // The real persisted state (Cache Storage), not a guess - lets the UI
+  // show accurate "Ready offline" / "Download" status even on a fresh
+  // page load before anything has been re-fetched this session.
+  async function isDownloaded(version) {
+    if (cache[version]) return true;
+    if (!('caches' in window)) return false;
     const file = fileByVersion[version] || fileByVersion.kjv;
-    loading[version] = fetch(file)
-      .then(res => {
-        if (!res.ok) throw new Error('Offline Bible data not available (HTTP ' + res.status + ')');
-        return res.text();
-      })
-      .then(text => {
-        const data = JSON.parse(stripBom(text));
-        cache[version] = data;
-        loading[version] = null;
-        return data;
-      })
-      .catch(err => { loading[version] = null; throw err; });
-    return loading[version];
+    try {
+      const match = await caches.match(file);
+      return !!match;
+    } catch (e) {
+      return false;
+    }
   }
 
   function testamentFor(bookNum) {
@@ -89,18 +136,14 @@ const OfflineBible = (function () {
     return { results, total: results.length };
   }
 
-  function isReady(version) {
-    return !!cache[version];
+  // Kicks off downloading both versions in the background so they're
+  // ready the moment the user opens the Bible tab or goes offline.
+  // Failures are swallowed here - js/pwa.js calls this on load and on
+  // reconnect, and the visible status row (js/bible_reader.js) shows and
+  // allows retrying anything that didn't succeed.
+  function preloadAll() {
+    return Promise.allSettled([download('kjv'), download('abhil82')]);
   }
 
-  // Kicks off parsing both versions in the background so they're instantly
-  // available the moment the user opens the Bible tab, online or not.
-  // Failures are swallowed - the reader simply falls back to the live API
-  // when this hasn't completed (e.g. the raw JSON files aren't cached yet
-  // on a brand-new install with no connection at all).
-  function preload() {
-    return Promise.allSettled([ensureLoaded('kjv'), ensureLoaded('abhil82')]);
-  }
-
-  return { getBooks, getChapter, search, isReady, preload };
+  return { download, isDownloaded, getBooks, getChapter, search, preloadAll };
 })();

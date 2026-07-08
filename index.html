@@ -1522,6 +1522,12 @@
         <button class="bible-icon-btn" onclick="BibleReader.openSearch()" title="Search">🔍</button>
       </div>
       <div class="screen-body">
+        <!-- Offline availability status - lets you download either version
+             to this device so it's readable with no connection, and shows
+             plainly if a download failed instead of silently breaking
+             offline reading later. -->
+        <div class="bible-offline-status" id="bible-offline-status"></div>
+
         <!-- Continue Reading card -->
         <div id="bible-last-read" class="bible-continue-card" style="display:none" onclick="BibleReader.continueReading()">
           <span class="bible-continue-icon">📖</span>
