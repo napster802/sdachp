@@ -24,6 +24,7 @@ Options -Indexes
 # respond. If your KSWEB build truly does not execute .php automatically,
 # enable PHP support in the KSWEB app settings instead of patching this file.
 
-# Game data now lives in MySQL (see api/db.php for connection settings)
-# instead of a SQLite file under this document root, so there is no local
-# database folder left to block web access to.
+# Game data lives in MySQL (see api/db.php for connection settings), not a
+# SQLite file under this document root. The database/ folder only holds a
+# static import seed file and generated export dumps; database/.htaccess
+# blocks direct web access to both, so they can't be fetched by URL.

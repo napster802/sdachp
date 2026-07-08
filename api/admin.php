@@ -102,6 +102,73 @@ if ($action === 'delete_player') {
     jsonOut(['success' => true]);
 }
 
+// ------------------------------------------------------------- export_database
+// Dumps every table's schema (SHOW CREATE TABLE) and data (SELECT *) to a
+// timestamped .sql file under database/exported/. Pure-PHP (no mysqldump
+// binary dependency) since shared/Android KSWEB PHP builds usually can't
+// shell out. The file is only ever served back out through
+// admin_export_download.php, which re-checks the passcode - it is never
+// linked from a public URL.
+if ($action === 'export_database') {
+    $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+
+    $sql  = "-- Bible Challenge Arena - Database export\n";
+    $sql .= "-- Generated " . date('Y-m-d H:i:s') . "\n\n";
+    $sql .= "SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS=0;\n\n";
+
+    foreach ($tables as $table) {
+        $createRow = $db->query("SHOW CREATE TABLE `$table`")->fetch();
+        $sql .= "DROP TABLE IF EXISTS `$table`;\n" . $createRow['Create Table'] . ";\n\n";
+
+        $stmt  = $db->query("SELECT * FROM `$table`");
+        $cols  = null;
+        $batch = [];
+        while ($row = $stmt->fetch()) {
+            if ($cols === null) $cols = array_keys($row);
+            $vals = array_map(function ($v) use ($db) {
+                return $v === null ? 'NULL' : $db->quote((string)$v);
+            }, array_values($row));
+            $batch[] = '(' . implode(',', $vals) . ')';
+            if (count($batch) >= 500) {
+                $sql .= "INSERT INTO `$table` (`" . implode('`,`', $cols) . "`) VALUES\n" . implode(",\n", $batch) . ";\n";
+                $batch = [];
+            }
+        }
+        if ($batch) {
+            $sql .= "INSERT INTO `$table` (`" . implode('`,`', $cols ?? []) . "`) VALUES\n" . implode(",\n", $batch) . ";\n";
+        }
+        $sql .= "\n";
+    }
+    $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
+
+    $dir = __DIR__ . '/../database/exported';
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    $filename = 'biblegame_export_' . date('Ymd_His') . '.sql';
+    if (file_put_contents($dir . '/' . $filename, $sql) === false) {
+        jsonOut(['success' => false, 'error' => 'Could not write export file. Check database/exported/ folder permissions.'], 500);
+    }
+
+    jsonOut(['success' => true, 'filename' => $filename, 'size_bytes' => strlen($sql), 'table_count' => count($tables)]);
+}
+
+// ---------------------------------------------------------------- list_exports
+if ($action === 'list_exports') {
+    $dir = __DIR__ . '/../database/exported';
+    $files = [];
+    if (is_dir($dir)) {
+        foreach (scandir($dir) as $f) {
+            if (!preg_match('/^biblegame_export_[0-9_]+\.sql$/', $f)) continue;
+            $files[] = [
+                'filename'    => $f,
+                'size_bytes'  => filesize($dir . '/' . $f),
+                'modified_at' => filemtime($dir . '/' . $f) * 1000,
+            ];
+        }
+    }
+    usort($files, fn($a, $b) => $b['modified_at'] <=> $a['modified_at']);
+    jsonOut(['success' => true, 'files' => $files]);
+}
+
 // -------------------------------------------------------------- import_database
 // Explicitly (re)creates every runtime table in the current database. getDB()
 // already runs initDB() (CREATE TABLE IF NOT EXISTS for everything) on every

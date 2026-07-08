@@ -57,6 +57,7 @@ const AdminDash = (function () {
   function refresh() {
     loadStats();
     loadPlayers();
+    loadExportList();
   }
 
   function loadStats() {
@@ -234,5 +235,48 @@ const AdminDash = (function () {
     });
   }
 
-  return { open, close, refresh, filterPlayers, applyDateFilter, clearDateFilter, openPtsModal, closePtsModal, applyPts, confirmDelete, importDatabase };
+  // ── Export database ───────────────────────────────────────
+  function exportDatabase() {
+    const btn    = document.getElementById('admin-export-btn');
+    const status = document.getElementById('admin-export-status');
+    if (btn) btn.disabled = true;
+    if (status) status.textContent = 'Exporting every table…';
+
+    api('export_database').then(res => {
+      if (!res.success) throw new Error(res.error || 'Export failed');
+      if (status) status.textContent = `✅ Exported ${res.table_count} tables (${fmtBytes(res.size_bytes)}) to database/exported/${res.filename}`;
+      App.showToast('Database exported successfully.', 'success');
+      loadExportList();
+    }).catch(err => {
+      if (status) status.textContent = '❌ ' + err.message;
+      App.showToast('Export failed: ' + err.message, 'error');
+    }).finally(() => {
+      if (btn) btn.disabled = false;
+    });
+  }
+
+  function fmtBytes(n) {
+    if (n == null) return '';
+    if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+    if (n >= 1024)    return (n / 1024).toFixed(1) + ' KB';
+    return n + ' B';
+  }
+
+  function loadExportList() {
+    const list = document.getElementById('admin-export-list');
+    if (!list) return;
+    api('list_exports').then(res => {
+      if (!res.success) return;
+      if (!res.files.length) { list.innerHTML = ''; return; }
+      list.innerHTML = res.files.map(f => `
+        <div class="admin-export-item">
+          <span class="admin-export-item-name">${escHtml(f.filename)}</span>
+          <span class="admin-export-item-meta">${fmtBytes(f.size_bytes)} • ${timeAgo(f.modified_at)}</span>
+          <a class="admin-export-item-dl" href="api/admin_export_download.php?passcode=12345678&file=${encodeURIComponent(f.filename)}">Download</a>
+        </div>
+      `).join('');
+    });
+  }
+
+  return { open, close, refresh, filterPlayers, applyDateFilter, clearDateFilter, openPtsModal, closePtsModal, applyPts, confirmDelete, importDatabase, exportDatabase };
 })();

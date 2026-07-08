@@ -1,0 +1,11 @@
+# Block all direct web access to this folder. Import files are meant to be
+# uploaded through phpMyAdmin/your MySQL client, not fetched over HTTP, and
+# exported dumps (which can contain live player data) are only ever served
+# back out through api/admin_export_download.php, which is passcode-gated.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

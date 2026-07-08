@@ -7,3 +7,7 @@ Thumbs.db
 node_modules/
 package.json
 package-lock.json
+
+# Generated database exports (per-deployment, contain live player data -
+# database/import/ is the tracked, shared seed file; this is not)
+database/exported/*.sql

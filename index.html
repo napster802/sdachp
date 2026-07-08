@@ -1349,6 +1349,12 @@
           <p class="admin-db-tools-hint">Run this after pointing the app at a new, empty MySQL database (e.g. following a backup restore). It (re)creates every table and seeds both Bible versions. Existing data is never deleted.</p>
           <div class="admin-db-tools-status" id="admin-import-status"></div>
         </div>
+        <div class="admin-db-tools">
+          <button class="btn btn-primary" id="admin-export-btn" onclick="AdminDash.exportDatabase()">⬇️ Export Database</button>
+          <p class="admin-db-tools-hint">Saves every table's structure and current data (players, rooms, history, Bible text, everything) to a downloadable .sql backup file.</p>
+          <div class="admin-db-tools-status" id="admin-export-status"></div>
+          <div class="admin-export-list" id="admin-export-list"></div>
+        </div>
         <!-- Stats -->
         <div class="admin-section-title">Live Overview</div>
         <div class="admin-dash-stats" id="admin-stats">

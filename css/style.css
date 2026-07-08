@@ -4302,6 +4302,42 @@ label,
   margin-top: 0.5rem;
   min-height: 1.2em;
 }
+.admin-export-list {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.admin-export-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.78rem;
+}
+.admin-export-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+.admin-export-item-meta {
+  opacity: 0.55;
+  white-space: nowrap;
+}
+.admin-export-item-dl {
+  color: #f0b90b;
+  text-decoration: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.admin-export-item-dl:hover {
+  text-decoration: underline;
+}
 
 /* ── Admin date/hour filter bar ──────────────────────────── */
 .admin-filter-bar {
