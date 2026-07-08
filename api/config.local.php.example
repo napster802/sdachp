@@ -1,0 +1,24 @@
+<?php
+/* ------------------------------------------------------------
+   Copy this file to api/config.local.php (same folder) and fill
+   in real values. api/config.local.php is git-ignored - it never
+   gets committed, so this is the right place for production
+   secrets on hosting that doesn't expose a real environment-
+   variable panel for classic PHP.
+
+   api/db.php includes this file automatically if it exists,
+   before reading any of these as environment variables.
+   ------------------------------------------------------------ */
+
+// A MySQL user scoped to only the biblegame database - NOT root.
+putenv('DB_USER=your_mysql_username');
+putenv('DB_PASS=your_mysql_password');
+
+// Optional overrides - uncomment if your host's MySQL isn't the default.
+// putenv('DB_HOST=127.0.0.1');
+// putenv('DB_PORT=3306');
+// putenv('DB_NAME=biblegame');
+
+// A long, random admin passcode - NOT "12345678". Generate one with e.g.
+// `php -r "echo bin2hex(random_bytes(16));"` and paste the result below.
+putenv('ADMIN_PASSCODE=change-me-to-a-long-random-value');

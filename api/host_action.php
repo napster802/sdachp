@@ -3,23 +3,32 @@ require_once __DIR__ . '/db.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { jsonOut([]); }
 
-$input    = getInput();
-$code     = trim($input['room_code'] ?? '');
-$deviceId = trim($input['device_id'] ?? '');
-$action   = trim($input['action'] ?? '');
+$input      = getInput();
+$code       = trim($input['room_code'] ?? '');
+$deviceId   = trim($input['device_id'] ?? '');
+$hostSecret = trim($input['host_secret'] ?? '');
+$action     = trim($input['action'] ?? '');
 
 if (!$code || !$deviceId || !$action) jsonOut(['success' => false, 'error' => 'Missing params'], 400);
 
 $db = getDB();
 
-$hostStmt = $db->prepare("SELECT * FROM players WHERE room_code = ? AND device_id = ? AND is_host = 1");
-$hostStmt->execute([$code, $deviceId]);
-if (!$hostStmt->fetch()) jsonOut(['success' => false, 'error' => 'Not authorized'], 403);
-
 $roomStmt = $db->prepare("SELECT * FROM rooms WHERE code = ?");
 $roomStmt->execute([$code]);
 $room = $roomStmt->fetch();
 if (!$room) jsonOut(['success' => false, 'error' => 'Room not found'], 404);
+
+// host_secret is generated once at create_room.php and only ever returned to
+// the creating browser - unlike device_id, room_state.php never broadcasts it
+// to other players, so knowing a room's device_id list (which anyone who has
+// the room code can read) is no longer enough to forge host actions.
+if ($hostSecret === '' || !hash_equals((string)$room['host_secret'], $hostSecret)) {
+    jsonOut(['success' => false, 'error' => 'Not authorized'], 403);
+}
+
+$hostStmt = $db->prepare("SELECT * FROM players WHERE room_code = ? AND device_id = ? AND is_host = 1");
+$hostStmt->execute([$code, $deviceId]);
+if (!$hostStmt->fetch()) jsonOut(['success' => false, 'error' => 'Not authorized'], 403);
 
 $now = nowMs();
 

@@ -9,7 +9,6 @@ $deviceId  = trim($input['device_id'] ?? '');
 $qIdx      = (int)($input['q_idx'] ?? -1);
 $choiceIdx = (int)($input['choice_idx'] ?? -1);
 $isCorrect = (bool)($input['is_correct'] ?? false);
-$timeTaken = (float)($input['time_taken'] ?? 0);
 
 if (!$code || !$deviceId || $qIdx < 0) jsonOut(['success' => false, 'error' => 'Missing params'], 400);
 
@@ -20,6 +19,12 @@ $stmt->execute([$code]);
 $room = $stmt->fetch();
 if (!$room || !in_array($room['status'], ['playing', 'blitz_active', 'hs_question'], true)) jsonOut(['success' => false, 'error' => 'Not in playing state'], 400);
 
+// time_taken is derived from the room's own server-recorded question-start
+// timestamp rather than trusted from the client - a forged time_taken:0
+// used to guarantee the maximum time-bonus on every question regardless of
+// how long the answer actually took.
+$now = nowMs();
+
 // Blitz has its own per-player question index flow
 if ($room['status'] === 'blitz_active') {
     $playerStmt2 = $db->prepare("SELECT * FROM players WHERE room_code = ? AND device_id = ?");
@@ -27,8 +32,8 @@ if ($room['status'] === 'blitz_active') {
     $playerRow2 = $playerStmt2->fetch();
     if ($playerRow2 && (int)$playerRow2['is_host'] === 1) jsonOut(['success' => false, 'error' => 'The host does not play'], 403);
 
-    $now = nowMs();
     $elapsed = $now - (int)$room['blitz_start_time'];
+    $timeTaken = max(0.0, $elapsed / 1000);
     $currentBlitzIdx = $playerRow2 ? (int)$playerRow2['blitz_q_idx'] : 0;
     if ($qIdx !== $currentBlitzIdx) jsonOut(['success' => false, 'error' => 'Wrong blitz question index'], 400);
 
@@ -58,6 +63,11 @@ if ($room['status'] === 'blitz_active') {
 
     jsonOut(['success' => true, 'points' => $points, 'is_correct' => $isCorrect, 'next_q_idx' => $newBlitzIdx]);
 }
+
+// Classic/Hot Seat: derive elapsed time from whichever server timestamp this
+// mode resets at question start (host_action.php keeps both in sync).
+$startField = $room['status'] === 'hs_question' ? 'hs_q_start_time' : 'q_start_time';
+$timeTaken = max(0.0, ($now - (int)$room[$startField]) / 1000);
 
 if ($room['status'] === 'hs_question') {
     // Only the current seater can answer
@@ -105,14 +115,17 @@ if ($isCorrect) {
     // Memory Match scores proportionally to pairs found even when the board
     // wasn't fully cleared, instead of the all-or-nothing rule every other
     // format uses - a half-finished board still deserves half credit.
-    $totalPairs = max(1, (int)($input['total_pairs'] ?? 6));
+    // total_pairs/pairs-found still come from the client (there's no
+    // server-side board state to check them against), so total_pairs is
+    // clamped to the same [1,6] range js/multiplayer.js's board generator
+    // (Math.max(1, Math.min(6, pool.length))) can ever legitimately produce,
+    // closing off arbitrarily large/small forged values.
+    $totalPairs = max(1, min(6, (int)($input['total_pairs'] ?? 6)));
     $pairsFound = max(0, min($totalPairs, $choiceIdx));
     $ratio = max(0.0, 1.0 - ($timeTaken / $timeLimit));
     $points = (int)round(($pairsFound / $totalPairs) * 500 * (1 + $ratio * 0.5));
 }
 $newBestStreak = max($prevBestStreak, $newStreak);
-
-$now = nowMs();
 
 $db->beginTransaction();
 

@@ -12,6 +12,9 @@ $avatar   = trim($input['avatar'] ?? '😊');
 if (!$code || !$deviceId || !$name) jsonOut(['success' => false, 'error' => 'Missing fields'], 400);
 
 $db = getDB();
+if (!checkRateLimit($db, 'join_room:' . clientIp(), 20, 60000)) {
+    jsonOut(['success' => false, 'error' => 'Too many join attempts, please wait a bit.'], 429);
+}
 
 $stmt = $db->prepare("SELECT * FROM rooms WHERE code = ?");
 $stmt->execute([$code]);

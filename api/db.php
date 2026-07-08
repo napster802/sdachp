@@ -7,10 +7,31 @@
    which looks exactly like a network failure ("Could not reach
    the host server") and hides the real cause.
    ------------------------------------------------------------ */
+// Restricts which origins get a CORS response instead of a wildcard "*" -
+// this app's own pages only ever call these endpoints same-origin (which
+// browsers don't apply CORS to at all), so the allow-list only matters for
+// blocking a foreign website's script from reading responses cross-origin.
+// Almost every POST endpoint here sends Content-Type: application/json,
+// which forces a CORS preflight - a non-matching Origin means the browser
+// never even sends the real request. Override via the ALLOWED_ORIGINS env
+// var (comma-separated) if the deployment domain differs.
+function corsOrigin(): string {
+    static $allowed = null;
+    if ($allowed === null) {
+        $envList = getenv('ALLOWED_ORIGINS');
+        $allowed = $envList !== false
+            ? array_map('trim', explode(',', $envList))
+            : ['https://sdachp.click', 'https://www.sdachp.click'];
+    }
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    return in_array($origin, $allowed, true) ? $origin : $allowed[0];
+}
+
 function sendJsonError(string $message, int $code = 500): void {
     if (!headers_sent()) {
         header('Content-Type: application/json; charset=utf-8');
-        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Origin: ' . corsOrigin());
+        header('Vary: Origin');
         header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
         header('Access-Control-Allow-Headers: Content-Type');
         http_response_code($code);
@@ -19,32 +40,64 @@ function sendJsonError(string $message, int $code = 500): void {
     exit;
 }
 
+// Real error detail (which can include DB connection strings and full
+// server file paths) goes to the server-side PHP error log only - the
+// client only ever sees a generic message. Also stops stray PHP warnings/
+// notices from printing into a response body ahead of the JSON and
+// corrupting it.
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
 set_exception_handler(function ($e) {
-    sendJsonError('Server error: ' . $e->getMessage());
+    error_log('Uncaught exception: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    sendJsonError('Server error, please try again.');
 });
 
 register_shutdown_function(function () {
     $err = error_get_last();
     if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
-        sendJsonError('Fatal server error: ' . $err['message']);
+        error_log('Fatal error: ' . $err['message'] . ' in ' . $err['file'] . ':' . $err['line']);
+        sendJsonError('Server error, please try again.');
     }
 });
 
-// MySQL connection settings. Override via environment variables for a real
-// server; the hardcoded fallbacks match a typical local MySQL/MariaDB setup
-// (e.g. KSWEB's bundled MySQL on Android, or a fresh local install) so the
-// app still works out of the box with zero configuration.
+// Optional, git-ignored local config file for secrets that can't be set as
+// real environment variables on control-panel-only hosting (most shared PHP
+// hosts don't expose an env-var panel for classic PHP the way they do for
+// Node/Python apps). Create api/config.local.php directly on the server
+// (copy api/config.local.php.example, fill in real values, never commit it)
+// to set DB_USER/DB_PASS/ADMIN_PASSCODE via putenv() before the getenv()
+// calls below run.
+$localConfigFile = __DIR__ . '/config.local.php';
+if (file_exists($localConfigFile)) require_once $localConfigFile;
+
+// MySQL connection settings. Host/port/name have safe fallbacks for local/LAN
+// dev (KSWEB's bundled MySQL on Android, or a fresh local install). DB_USER
+// and DB_PASS deliberately have NO fallback - defaulting to root/no-password
+// is fine on a throwaway local dev database but dangerous to carry into a
+// real internet-facing deployment by accident, so a missing credential fails
+// closed with a clear error instead of silently connecting as root.
 define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
 define('DB_PORT', getenv('DB_PORT') ?: '3306');
 define('DB_NAME', getenv('DB_NAME') ?: 'biblegame');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+$envDbUser = getenv('DB_USER');
+$envDbPass = getenv('DB_PASS');
+define('DB_USER', $envDbUser !== false ? $envDbUser : null);
+define('DB_PASS', $envDbPass !== false ? $envDbPass : null);
+
+// Same "no insecure fallback" treatment for the admin passcode - see
+// api/admin.php. Null means "not configured", handled there.
+$envAdminPasscode = getenv('ADMIN_PASSCODE');
+define('ADMIN_PASSCODE', $envAdminPasscode !== false ? $envAdminPasscode : null);
 
 function getDB(): PDO {
     static $db = null;
     if ($db === null) {
         if (!extension_loaded('pdo_mysql')) {
             throw new RuntimeException('The pdo_mysql PHP extension is not enabled. Enable it in your PHP settings.');
+        }
+        if (DB_USER === null || DB_PASS === null) {
+            throw new RuntimeException('Database not configured: set the DB_USER and DB_PASS environment variables (or create api/config.local.php - see api/config.local.php.example).');
         }
         $dsn = 'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=utf8mb4';
         try {
@@ -138,7 +191,8 @@ function initDB(PDO $db): void {
             imp_shadow_new_id VARCHAR(36),
             impostor_last_phantom BIGINT DEFAULT 0,
             impostor_last_shepherd BIGINT DEFAULT 0,
-            impostor_last_healer BIGINT DEFAULT 0
+            impostor_last_healer BIGINT DEFAULT 0,
+            host_secret VARCHAR(32)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         CREATE TABLE IF NOT EXISTS players (
             device_id VARCHAR(36) NOT NULL,
@@ -363,12 +417,41 @@ function initDB(PDO $db): void {
             active_ms_accum   BIGINT DEFAULT 0,
             last_heartbeat_at BIGINT DEFAULT 0
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        CREATE TABLE IF NOT EXISTS admin_sessions (
+            token      VARCHAR(64) PRIMARY KEY,
+            created_at BIGINT NOT NULL,
+            expires_at BIGINT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        CREATE TABLE IF NOT EXISTS login_attempts (
+            id           BIGINT PRIMARY KEY AUTO_INCREMENT,
+            ip           VARCHAR(45) NOT NULL,
+            attempted_at BIGINT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip, attempted_at);
+        CREATE TABLE IF NOT EXISTS rate_limits (
+            rl_key       VARCHAR(80) PRIMARY KEY,
+            window_start BIGINT NOT NULL,
+            count        BIGINT NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
+
+    // Migration: `rooms` already existed (created before host_secret was
+    // introduced) on some deployments - CREATE TABLE IF NOT EXISTS above only
+    // applies to brand-new tables, not new columns on an existing one. MySQL
+    // (unlike MariaDB) has no ADD COLUMN IF NOT EXISTS, so check first.
+    $hasHostSecret = $db->query("
+        SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'rooms' AND column_name = 'host_secret'
+    ")->fetchColumn();
+    if (!$hasHostSecret) {
+        $db->exec("ALTER TABLE rooms ADD COLUMN host_secret VARCHAR(32)");
+    }
 }
 
 function jsonOut(array $data, int $code = 200): void {
     header('Content-Type: application/json; charset=utf-8');
-    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Origin: ' . corsOrigin());
+    header('Vary: Origin');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type');
     http_response_code($code);
@@ -387,6 +470,52 @@ function nowMs(): int {
 
 function generateCode(): string {
     return str_pad((string)random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+}
+
+/* ------------------------------------------------------------
+   ADMIN SESSION TOKENS
+   Replaces the old "resend the hardcoded passcode on every
+   request" model. api/admin.php's login action issues a random
+   token after checking ADMIN_PASSCODE once; every other admin
+   action (admin.php, admin_export_download.php,
+   upload_questions.php, scrape_abhil82.php) just validates that
+   token here instead of re-checking a shared secret.
+   ------------------------------------------------------------ */
+/* ------------------------------------------------------------
+   Basic per-key rate limiting (fixed window), backed by the
+   rate_limits table. Good enough insurance against a bored script
+   hammering an endpoint - not meant to withstand a determined
+   distributed attacker, which is out of scope for this app's
+   friends-and-family deployment scale.
+   ------------------------------------------------------------ */
+function checkRateLimit(PDO $db, string $key, int $maxCount, int $windowMs): bool {
+    $now = nowMs();
+    $stmt = $db->prepare("SELECT window_start, count FROM rate_limits WHERE rl_key = ?");
+    $stmt->execute([$key]);
+    $row = $stmt->fetch();
+
+    if (!$row || $now - (int)$row['window_start'] >= $windowMs) {
+        $db->prepare("REPLACE INTO rate_limits (rl_key, window_start, count) VALUES (?, ?, 1)")->execute([$key, $now]);
+        return true;
+    }
+    if ((int)$row['count'] >= $maxCount) return false;
+
+    $db->prepare("UPDATE rate_limits SET count = count + 1 WHERE rl_key = ?")->execute([$key]);
+    return true;
+}
+
+function clientIp(): string {
+    return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+}
+
+function requireAdminToken(PDO $db, string $token): void {
+    if ($token === '') jsonOut(['success' => false, 'error' => 'Unauthorized'], 401);
+    $stmt = $db->prepare("SELECT expires_at FROM admin_sessions WHERE token = ?");
+    $stmt->execute([$token]);
+    $row = $stmt->fetch();
+    if (!$row || (int)$row['expires_at'] < nowMs()) {
+        jsonOut(['success' => false, 'error' => 'Session expired. Please log in again.'], 401);
+    }
 }
 
 function cleanStale(PDO $db): void {

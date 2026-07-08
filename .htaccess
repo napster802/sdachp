@@ -8,12 +8,13 @@ DirectoryIndex index.html
 # Hide directory listings
 Options -Indexes
 
-# Allow LAN devices (other players) to call the PHP API from a different origin/port
-<IfModule mod_headers.c>
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type"
-</IfModule>
+# CORS is handled per-request in api/db.php's corsOrigin() (restricted to an
+# allow-list rather than "*", now that this runs on a public domain instead
+# of LAN-only) - this block is deliberately NOT setting
+# Access-Control-Allow-Origin here so PHP's own header() call is the only
+# one that applies (Apache would otherwise send both, and having two
+# Access-Control-Allow-Origin headers on one response is invalid/unreliable
+# across browsers).
 
 # NOTE: We deliberately do NOT force a PHP SetHandler here. KSWEB (and most
 # Apache+PHP builds) already register .php files with their own handler

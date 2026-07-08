@@ -1,21 +1,51 @@
 <?php
 /* ------------------------------------------------------------
    Admin dashboard backend.
-   All actions require the correct passcode in the POST body.
+   action=login checks ADMIN_PASSCODE (see api/config.local.php.example)
+   and issues a random session token; every other action requires
+   that token instead of resending the passcode every time.
    ------------------------------------------------------------ */
 require_once __DIR__ . '/db.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { jsonOut([]); }
 
-$input    = getInput();
-$action   = trim($input['action']   ?? '');
-$passcode = trim($input['passcode'] ?? '');
-
-if ($passcode !== '12345678') {
-    jsonOut(['success' => false, 'error' => 'Unauthorized'], 401);
-}
+$input  = getInput();
+$action = trim($input['action'] ?? '');
 
 $db = getDB();
+
+// --------------------------------------------------------------------- login
+if ($action === 'login') {
+    $ip  = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $now = nowMs();
+
+    // Brute-force lockout: 5 failed attempts per IP per 15-minute window.
+    $windowStart = $now - 15 * 60 * 1000;
+    $countStmt = $db->prepare("SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND attempted_at > ?");
+    $countStmt->execute([$ip, $windowStart]);
+    if ((int)$countStmt->fetchColumn() >= 5) {
+        jsonOut(['success' => false, 'error' => 'Too many attempts. Try again in 15 minutes.'], 429);
+    }
+
+    if (ADMIN_PASSCODE === null) {
+        jsonOut(['success' => false, 'error' => 'Admin passcode is not configured on the server.'], 500);
+    }
+
+    $passcode = trim($input['passcode'] ?? '');
+    if (!hash_equals(ADMIN_PASSCODE, $passcode)) {
+        $db->prepare("INSERT INTO login_attempts (ip, attempted_at) VALUES (?, ?)")->execute([$ip, $now]);
+        jsonOut(['success' => false, 'error' => 'Incorrect passcode'], 401);
+    }
+
+    $token = bin2hex(random_bytes(32));
+    $expiresAt = $now + 12 * 3600 * 1000; // 12h session
+    $db->prepare("INSERT INTO admin_sessions (token, created_at, expires_at) VALUES (?, ?, ?)")
+       ->execute([$token, $now, $expiresAt]);
+    jsonOut(['success' => true, 'token' => $token, 'expires_at' => $expiresAt]);
+}
+
+// Every other action requires a valid session token from a prior login.
+requireAdminToken($db, trim($input['token'] ?? ''));
 
 // ------------------------------------------------------------------ get_stats
 if ($action === 'get_stats') {
@@ -110,6 +140,9 @@ if ($action === 'delete_player') {
 // admin_export_download.php, which re-checks the passcode - it is never
 // linked from a public URL.
 if ($action === 'export_database') {
+    if (!checkRateLimit($db, 'export_database:' . clientIp(), 5, 3600000)) {
+        jsonOut(['success' => false, 'error' => 'Too many exports, please wait a while.'], 429);
+    }
     $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
 
     $sql  = "-- Bible Challenge Arena - Database export\n";
@@ -146,6 +179,14 @@ if ($action === 'export_database') {
     $filename = 'biblegame_export_' . date('Ymd_His') . '.sql';
     if (file_put_contents($dir . '/' . $filename, $sql) === false) {
         jsonOut(['success' => false, 'error' => 'Could not write export file. Check database/exported/ folder permissions.'], 500);
+    }
+
+    // Retention: keep at most the 10 most recent exports so repeated use
+    // can't slowly fill the disk.
+    $existing = glob($dir . '/biblegame_export_*.sql') ?: [];
+    usort($existing, fn($a, $b) => filemtime($b) <=> filemtime($a));
+    foreach (array_slice($existing, 10) as $old) {
+        @unlink($old);
     }
 
     jsonOut(['success' => true, 'filename' => $filename, 'size_bytes' => strlen($sql), 'table_count' => count($tables)]);

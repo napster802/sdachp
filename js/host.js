@@ -10,6 +10,7 @@ const HostGame = (function () {
   const API = 'api/';
   const SHARE_IP_KEY = 'bca_hotspot_ip';
   let roomCode = null;
+  let hostSecret = null;
   let gameFormat = 'classic';
   let quizMode = 'difficulty';
   let selectedDifficulty = 'easy';
@@ -30,6 +31,7 @@ const HostGame = (function () {
     return api('host_action.php', Object.assign({
       room_code: roomCode,
       device_id: Profile.getDeviceId(),
+      host_secret: hostSecret,
       action: act
     }, extra || {}));
   }
@@ -48,6 +50,7 @@ const HostGame = (function () {
         return;
       }
       roomCode = res.room_code;
+      hostSecret = res.host_secret;
       gameFormat = 'classic';
       quizMode = 'difficulty';
       selectedDifficulty = 'easy';
@@ -515,7 +518,7 @@ const HostGame = (function () {
 
     const reader = new FileReader();
     reader.onload = () => {
-      api('upload_questions.php', { admin_passcode: Admin.getPasscode(), csv_text: reader.result })
+      api('upload_questions.php', { token: Admin.getToken(), csv_text: reader.result })
         .then(res => {
           if (!res.success) {
             if (resultEl) resultEl.textContent = res.error || 'Upload failed';
@@ -567,8 +570,8 @@ const HostGame = (function () {
     const newCode = input ? input.value.trim() : '';
     if (error) error.textContent = '';
 
-    if (!/^\d{1,6}$/.test(newCode)) {
-      if (error) error.textContent = 'Enter up to 6 digits.';
+    if (!/^\d{6}$/.test(newCode)) {
+      if (error) error.textContent = 'Enter exactly 6 digits.';
       return;
     }
     if (!roomCode) return;
@@ -576,6 +579,7 @@ const HostGame = (function () {
     api('set_room_code.php', {
       room_code: roomCode,
       device_id: Profile.getDeviceId(),
+      host_secret: hostSecret,
       new_code: newCode
     }).then(res => {
       if (!res.success) {

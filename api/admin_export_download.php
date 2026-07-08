@@ -7,11 +7,20 @@
    ------------------------------------------------------------ */
 require_once __DIR__ . '/db.php';
 
-$passcode = trim($_GET['passcode'] ?? '');
-if ($passcode !== '12345678') {
+$db = getDB();
+$token = trim($_GET['token'] ?? '');
+if ($token === '') {
     http_response_code(401);
     header('Content-Type: text/plain');
     exit('Unauthorized');
+}
+$stmt = $db->prepare("SELECT expires_at FROM admin_sessions WHERE token = ?");
+$stmt->execute([$token]);
+$row = $stmt->fetch();
+if (!$row || (int)$row['expires_at'] < nowMs()) {
+    http_response_code(401);
+    header('Content-Type: text/plain');
+    exit('Session expired. Please log in again.');
 }
 
 $filename = basename(trim($_GET['file'] ?? ''));

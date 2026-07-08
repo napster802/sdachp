@@ -61,6 +61,13 @@ switch ($action) {
             $db->prepare("UPDATE profiles SET wallet = wallet - ?, booster_count = booster_count + 1, updated_at = ? WHERE device_id = ?")
                ->execute([BOOSTER_PRICE, nowMs(), $deviceId]);
         } else {
+            // $ownedCol is interpolated directly into the UPDATE below - safe
+            // today only because parseItem() already constrained $item['type']
+            // to a key of ITEM_TYPES via the regex match above. This assert
+            // makes that invariant explicit so a future edit that lets 'type'
+            // flow in from somewhere else can't silently turn this into a
+            // column-name SQL injection.
+            if (!array_key_exists($item['type'], ITEM_TYPES)) jsonOut(['success' => false, 'error' => 'Unknown item'], 400);
             [$count, $price, $ownedCol] = ITEM_TYPES[$item['type']];
             $ownedList = json_decode($profile[$ownedCol] ?: '[]', true) ?: [];
             if (in_array($itemId, $ownedList, true)) jsonOut(['success' => false, 'error' => 'Already owned'], 400);
@@ -73,7 +80,9 @@ switch ($action) {
 
     case 'equip': {
         $item = parseItem($itemId);
-        if (!$item || $item['type'] === 'booster') jsonOut(['success' => false, 'error' => 'Unknown item'], 400);
+        if (!$item || $item['type'] === 'booster' || !array_key_exists($item['type'], ITEM_TYPES)) {
+            jsonOut(['success' => false, 'error' => 'Unknown item'], 400);
+        }
         [$count, $price, $ownedCol, $equippedCol] = ITEM_TYPES[$item['type']];
         $ownedList = json_decode($profile[$ownedCol] ?: '[]', true) ?: [];
         if (!in_array($itemId, $ownedList, true)) jsonOut(['success' => false, 'error' => 'You do not own this item'], 400);

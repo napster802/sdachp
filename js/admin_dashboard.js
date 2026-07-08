@@ -13,8 +13,14 @@ const AdminDash = (function () {
     return fetch('api/admin.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ passcode: '12345678', action }, extra))
-    }).then(r => r.json());
+      body: JSON.stringify(Object.assign({ token: Admin.getToken(), action }, extra))
+    }).then(r => r.json()).then(res => {
+      if (!res.success && res.error === 'Session expired. Please log in again.') {
+        Admin.logout();
+        App.showToast('Your admin session expired. Please sign in again.', 'error');
+      }
+      return res;
+    });
   }
 
   function fmtNum(n) {
@@ -272,7 +278,7 @@ const AdminDash = (function () {
         <div class="admin-export-item">
           <span class="admin-export-item-name">${escHtml(f.filename)}</span>
           <span class="admin-export-item-meta">${fmtBytes(f.size_bytes)} • ${timeAgo(f.modified_at)}</span>
-          <a class="admin-export-item-dl" href="api/admin_export_download.php?passcode=12345678&file=${encodeURIComponent(f.filename)}">Download</a>
+          <a class="admin-export-item-dl" href="api/admin_export_download.php?token=${encodeURIComponent(Admin.getToken())}&file=${encodeURIComponent(f.filename)}">Download</a>
         </div>
       `).join('');
     });

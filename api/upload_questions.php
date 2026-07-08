@@ -1,15 +1,12 @@
 <?php
 /* ------------------------------------------------------------
-   Admin-only CSV question import. Auth here mirrors js/admin.js's
-   "casual client-side gate" model (not secure credential storage) -
-   the hardcoded passcode is just to keep this off-by-default for
-   randoms on the LAN, not a real security boundary.
+   Admin-only CSV question import. Requires a valid admin session
+   token from api/admin.php's login action - see requireAdminToken()
+   in db.php.
    ------------------------------------------------------------ */
 require_once __DIR__ . '/db.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { jsonOut([]); }
-
-const ADMIN_PASSCODE = '12345678';
 
 const VALID_BOOKS = [
     'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy',
@@ -31,8 +28,8 @@ const VALID_CATEGORIES = ['character', 'animals', 'things', 'places', 'events'];
 const VALID_DIFFICULTIES = ['easy', 'medium', 'hard', 'expert'];
 
 $input = getInput();
-$passcode = trim($input['admin_passcode'] ?? '');
-if ($passcode !== ADMIN_PASSCODE) jsonOut(['success' => false, 'error' => 'Not authorized'], 403);
+$db = getDB();
+requireAdminToken($db, trim($input['token'] ?? ''));
 
 $csvText = $input['csv_text'] ?? '';
 if (!is_string($csvText) || trim($csvText) === '') jsonOut(['success' => false, 'error' => 'No CSV content provided'], 400);

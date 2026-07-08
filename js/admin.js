@@ -1,18 +1,21 @@
 /* ============================================================
    Bible Challenge Arena - Admin Gate
-   Casual client-side login gate (not secure credential storage)
-   protecting Host Game and clearing Hall of Fame history.
-   Default credentials: admin / 12345678
+   Login posts the passcode to api/admin.php once; the server
+   checks it against ADMIN_PASSCODE (never shipped to the client)
+   and issues a session token, which is what every subsequent
+   admin action sends instead of the passcode itself.
    ============================================================ */
 const Admin = (function () {
-  const USERNAME = 'admin';
-  const PASSWORD = '12345678';
-  const SESSION_KEY = 'bca_admin_authed';
+  const TOKEN_KEY = 'bca_admin_token';
 
   let onSuccess = null;
 
+  function getToken() {
+    return sessionStorage.getItem(TOKEN_KEY) || '';
+  }
+
   function isAuthenticated() {
-    return sessionStorage.getItem(SESSION_KEY) === '1';
+    return !!getToken();
   }
 
   function requireAdmin(callback) {
@@ -27,13 +30,11 @@ const Admin = (function () {
   function openLoginOverlay() {
     const overlay = document.getElementById('overlay-admin-login');
     const error = document.getElementById('admin-login-error');
-    const userInput = document.getElementById('admin-username-input');
     const passInput = document.getElementById('admin-password-input');
     if (error) error.textContent = '';
-    if (userInput) userInput.value = '';
     if (passInput) passInput.value = '';
     if (overlay) overlay.style.display = 'flex';
-    if (userInput) userInput.focus();
+    if (passInput) passInput.focus();
   }
 
   function closeLoginOverlay() {
@@ -43,32 +44,34 @@ const Admin = (function () {
   }
 
   function attemptLogin() {
-    const userInput = document.getElementById('admin-username-input');
     const passInput = document.getElementById('admin-password-input');
     const error = document.getElementById('admin-login-error');
-    const user = userInput ? userInput.value.trim() : '';
     const pass = passInput ? passInput.value : '';
 
-    if (user === USERNAME && pass === PASSWORD) {
-      sessionStorage.setItem(SESSION_KEY, '1');
+    if (error) error.textContent = 'Signing in…';
+
+    fetch('api/admin.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'login', passcode: pass })
+    }).then(r => r.json()).then(res => {
+      if (!res.success) {
+        if (error) error.textContent = res.error || 'Incorrect passcode.';
+        return;
+      }
+      sessionStorage.setItem(TOKEN_KEY, res.token);
       const overlay = document.getElementById('overlay-admin-login');
       if (overlay) overlay.style.display = 'none';
       const callback = onSuccess;
       onSuccess = null;
       if (callback) callback();
-    } else if (error) {
-      error.textContent = 'Incorrect username or password.';
-    }
+    }).catch(err => {
+      if (error) error.textContent = 'Could not reach the server: ' + err.message;
+    });
   }
 
   function logout() {
-    sessionStorage.removeItem(SESSION_KEY);
-  }
-
-  // Exposed only so the admin-only CSV question upload can authenticate its
-  // server request - same "casual gate" model as the rest of this module.
-  function getPasscode() {
-    return PASSWORD;
+    sessionStorage.removeItem(TOKEN_KEY);
   }
 
   return {
@@ -78,6 +81,6 @@ const Admin = (function () {
     closeLoginOverlay,
     attemptLogin,
     logout,
-    getPasscode
+    getToken
   };
 })();

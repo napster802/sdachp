@@ -14,7 +14,17 @@ require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache');
-header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Origin: ' . corsOrigin());
+header('Vary: Origin');
+
+// This is a one-time content-import dev tool (fetches ~1,200 chapters from
+// bible.com, up to 5 minutes of blocking outbound requests per call, and
+// ?action=finalize truncates the live bible_abhil82 table) - it must not be
+// reachable by anyone who doesn't already have admin access. The bundled
+// database/import/biblegame_full_import.sql already ships ABHIL82
+// pre-seeded, so most deployments will never need to run this at all.
+$db = getDB();
+requireAdminToken($db, trim($_GET['token'] ?? ''));
 
 $action  = trim($_GET['action'] ?? 'check');
 $workDir = __DIR__ . '/../bible/abhil82_work';

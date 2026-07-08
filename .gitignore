@@ -11,3 +11,7 @@ package-lock.json
 # Generated database exports (per-deployment, contain live player data -
 # database/import/ is the tracked, shared seed file; this is not)
 database/exported/*.sql
+
+# Real production secrets (DB creds, admin passcode) - copy
+# api/config.local.php.example to create this, never commit it
+api/config.local.php

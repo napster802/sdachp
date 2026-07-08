@@ -3,14 +3,14 @@ require_once __DIR__ . '/db.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { jsonOut([]); }
 
-$input    = getInput();
-$code     = trim($input['room_code'] ?? '');
-$deviceId = trim($input['device_id'] ?? '');
-$newCode  = trim($input['new_code'] ?? '');
+$input      = getInput();
+$code       = trim($input['room_code'] ?? '');
+$deviceId   = trim($input['device_id'] ?? '');
+$hostSecret = trim($input['host_secret'] ?? '');
+$newCode    = trim($input['new_code'] ?? '');
 
 if (!$code || !$deviceId || !$newCode) jsonOut(['success' => false, 'error' => 'Missing fields'], 400);
-if (!preg_match('/^\d{1,6}$/', $newCode)) jsonOut(['success' => false, 'error' => 'Code must be up to 6 digits.'], 400);
-$newCode = str_pad($newCode, 6, '0', STR_PAD_LEFT);
+if (!preg_match('/^\d{6}$/', $newCode)) jsonOut(['success' => false, 'error' => 'Code must be exactly 6 digits.'], 400);
 
 $db = getDB();
 
@@ -19,6 +19,9 @@ $stmt->execute([$code]);
 $room = $stmt->fetch();
 
 if (!$room) jsonOut(['success' => false, 'error' => 'Room not found'], 404);
+if ($hostSecret === '' || !hash_equals((string)$room['host_secret'], $hostSecret)) {
+    jsonOut(['success' => false, 'error' => 'Only the host can change the room code.'], 403);
+}
 if ($room['host_device_id'] !== $deviceId) jsonOut(['success' => false, 'error' => 'Only the host can change the room code.'], 403);
 if ($room['status'] !== 'lobby') jsonOut(['success' => false, 'error' => 'Cannot change the code after the game starts.'], 400);
 

@@ -673,7 +673,7 @@ const BibleReader = (function () {
 
   async function checkAbhil82Status() {
     try {
-      const r = await fetch('api/scrape_abhil82.php?action=check');
+      const r = await fetch('api/scrape_abhil82.php?action=check&token=' + encodeURIComponent(Admin.getToken()));
       const d = await r.json();
       const done = d.done_books || [];
       dl.booksDone = done.length;
@@ -746,7 +746,7 @@ const BibleReader = (function () {
     const body = document.getElementById('abhil82-setup-body');
     if (body) body.innerHTML = '<p class="abhil82-info">Testing connection to bible.com…</p>';
     try {
-      const r = await fetch('api/scrape_abhil82.php?action=test');
+      const r = await fetch('api/scrape_abhil82.php?action=test&token=' + encodeURIComponent(Admin.getToken()));
       const d = await r.json();
       if (!d.success) {
         if (body) body.innerHTML = `<p class="abhil82-info abhil82-error">Cannot reach bible.com: ${escHtml(d.error||'Unknown error')}</p>
@@ -777,7 +777,7 @@ const BibleReader = (function () {
       renderSetupProgress(book, `Book ${book}`, book - 1, dl.chapsDone);
 
       try {
-        const r = await fetch(`api/scrape_abhil82.php?action=scrape&book=${book}`);
+        const r = await fetch(`api/scrape_abhil82.php?action=scrape&book=${book}&token=${encodeURIComponent(Admin.getToken())}`);
         const d = await r.json();
         if (!d.success) throw new Error(d.error || 'Server error');
         dl.chapsDone += (BOOK_CHAPTERS[book-1] || 0);
@@ -804,7 +804,7 @@ const BibleReader = (function () {
     const body = document.getElementById('abhil82-setup-body');
     if (body) body.innerHTML = '<p class="abhil82-info">Saving ABHIL82 Bible data…</p>';
     try {
-      const r = await fetch('api/scrape_abhil82.php?action=finalize');
+      const r = await fetch('api/scrape_abhil82.php?action=finalize&token=' + encodeURIComponent(Admin.getToken()));
       const d = await r.json();
       if (!d.success) throw new Error(d.error);
       if (body) body.innerHTML = `
@@ -824,7 +824,7 @@ const BibleReader = (function () {
     const body = document.getElementById('abhil82-setup-body');
     if (body) body.innerHTML = '<p class="abhil82-info">Clearing progress…</p>';
     try {
-      await fetch('api/scrape_abhil82.php?action=reset');
+      await fetch('api/scrape_abhil82.php?action=reset&token=' + encodeURIComponent(Admin.getToken()));
       dl.booksDone = 0;
       dl.chapsDone = 0;
       renderSetupIdle('Progress cleared. Ready to start fresh.');
