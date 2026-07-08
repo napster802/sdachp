@@ -7,11 +7,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0a1a3e">
   <title>Bible Challenge Arena</title>
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="images/icon-192.png">
+  <link rel="apple-touch-icon" href="images/icon-192.png">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
   <div id="toast-container"></div>
+  <div id="offline-badge" style="display:none">📴 Offline</div>
   <div id="reaction-layer"></div>
   <div id="chat-feed"></div>
 
@@ -65,6 +69,7 @@
           </button>
         </div>
         <div class="home-links">
+          <button class="btn btn-ghost" onclick="SoloQuiz.open()">🧠 Solo Practice</button>
           <button class="btn btn-ghost" onclick="App.goTo('history')">🏆 Hall of Fame</button>
           <button class="btn btn-ghost" onclick="BibleReader.open()">📖 Bible</button>
           <button class="btn btn-ghost" onclick="App.goMyProfile()">👤 My Profile</button>
@@ -97,6 +102,94 @@
           </div>
 
           <button class="btn btn-primary btn-xl" id="profile-save-btn" onclick="App.profileSaveContinue()">Save Profile</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: SOLO PRACTICE - SETUP ==================== -->
+    <div class="screen" id="screen-solo-setup">
+      <div class="screen-header">
+        <button class="btn-back" onclick="SoloQuiz.close()">‹</button>
+        <h2>🧠 Solo Practice</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body">
+        <p class="hint-text">Practice trivia by yourself, anytime - even offline. Your score here is personal practice only; it never affects your wallet or the leaderboard.</p>
+
+        <div class="admin-section-title">Difficulty</div>
+        <div class="solo-difficulty-grid" id="solo-difficulty-grid">
+          <button class="btn btn-secondary solo-diff-btn active" data-diff="easy" onclick="SoloQuiz.setDifficulty('easy')">😊 Easy</button>
+          <button class="btn btn-secondary solo-diff-btn" data-diff="medium" onclick="SoloQuiz.setDifficulty('medium')">🙂 Medium</button>
+          <button class="btn btn-secondary solo-diff-btn" data-diff="hard" onclick="SoloQuiz.setDifficulty('hard')">😐 Hard</button>
+          <button class="btn btn-secondary solo-diff-btn" data-diff="expert" onclick="SoloQuiz.setDifficulty('expert')">🔥 Expert</button>
+        </div>
+
+        <div class="admin-section-title">How many questions?</div>
+        <div class="solo-count-grid" id="solo-count-grid">
+          <button class="btn btn-secondary solo-count-btn" data-count="5" onclick="SoloQuiz.setCount(5)">5</button>
+          <button class="btn btn-secondary solo-count-btn active" data-count="10" onclick="SoloQuiz.setCount(10)">10</button>
+          <button class="btn btn-secondary solo-count-btn" data-count="20" onclick="SoloQuiz.setCount(20)">20</button>
+        </div>
+
+        <div class="solo-best-box" id="solo-best-box" style="display:none">
+          <span class="hint-text">🏅 Personal best (<span id="solo-best-diff"></span>): <strong id="solo-best-score">0</strong> pts</span>
+        </div>
+
+        <button class="btn btn-primary btn-xl" onclick="SoloQuiz.start()">▶️ Start Practice</button>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: SOLO PRACTICE - QUESTION ==================== -->
+    <div class="screen" id="screen-solo-question">
+      <div class="screen-header">
+        <button class="btn-back" onclick="SoloQuiz.quit()">‹</button>
+        <h2 id="solo-q-counter">Question 1/10</h2>
+        <span class="pts-val" id="solo-q-score">0</span>
+      </div>
+      <div class="screen-body">
+        <div class="q-progress">
+          <div class="q-progress-fill" id="solo-q-progress-fill" style="width:100%"></div>
+        </div>
+        <div class="q-box">
+          <p class="q-text" id="solo-q-text">Loading…</p>
+        </div>
+        <div class="choices-grid">
+          <button class="choice choice-a" id="solo-c0" onclick="SoloQuiz.answer(0)">
+            <span class="choice-ltr">A</span>
+            <span class="choice-txt" id="solo-c0-txt"></span>
+          </button>
+          <button class="choice choice-b" id="solo-c1" onclick="SoloQuiz.answer(1)">
+            <span class="choice-ltr">B</span>
+            <span class="choice-txt" id="solo-c1-txt"></span>
+          </button>
+          <button class="choice choice-c" id="solo-c2" onclick="SoloQuiz.answer(2)">
+            <span class="choice-ltr">C</span>
+            <span class="choice-txt" id="solo-c2-txt"></span>
+          </button>
+          <button class="choice choice-d" id="solo-c3" onclick="SoloQuiz.answer(3)">
+            <span class="choice-ltr">D</span>
+            <span class="choice-txt" id="solo-c3-txt"></span>
+          </button>
+        </div>
+        <p class="hint-text" id="solo-q-streak"></p>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN: SOLO PRACTICE - RESULTS ==================== -->
+    <div class="screen" id="screen-solo-results">
+      <div class="screen-header">
+        <button class="btn-back" onclick="SoloQuiz.close()">‹</button>
+        <h2>Practice Results</h2>
+        <div class="spacer"></div>
+      </div>
+      <div class="screen-body" style="text-align:center;">
+        <div class="logo-icon">🧠</div>
+        <h2 id="solo-results-score">0 pts</h2>
+        <p class="hint-text" id="solo-results-detail">0 correct, 0 wrong</p>
+        <p class="hint-text" id="solo-results-best" style="display:none"></p>
+        <div class="home-buttons">
+          <button class="btn btn-primary btn-xl" onclick="SoloQuiz.open()">🔁 Practice Again</button>
+          <button class="btn btn-secondary btn-xl" onclick="SoloQuiz.close()">🏠 Home</button>
         </div>
       </div>
     </div>
@@ -1554,9 +1647,13 @@
   <script src="js/shop.js"></script>
   <script src="js/admin.js"></script>
   <script src="js/admin_dashboard.js"></script>
+  <script src="js/offline_bible.js"></script>
+  <script src="js/offline_queue.js"></script>
   <script src="js/bible_reader.js"></script>
+  <script src="js/solo_quiz.js"></script>
   <script src="js/qrcode.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/pwa.js"></script>
   <script src="js/multiplayer.js"></script>
   <script src="js/host.js"></script>
   <script src="js/join.js"></script>

@@ -343,6 +343,7 @@ const App = (function () {
         else if (pending === 'join') goTo('join-entry');
         else if (pending === 'my-profile') goTo('my-profile');
         else if (pending === 'shop') goTo('shop');
+        else if (pending === 'solo' && typeof SoloQuiz !== 'undefined') SoloQuiz.open();
       })
       .catch(function () {
         if (saveBtn) saveBtn.disabled = false;

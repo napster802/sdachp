@@ -446,6 +446,18 @@ function initDB(PDO $db): void {
     if (!$hasHostSecret) {
         $db->exec("ALTER TABLE rooms ADD COLUMN host_secret VARCHAR(32)");
     }
+
+    // Same pattern: bible_reading_progress predates offline reading-rewards
+    // sync (see api/sync_offline_reading.php), which needs a column to
+    // remember the last processed sync batch so a retried/duplicated sync
+    // request can't double-credit.
+    $hasBatchId = $db->query("
+        SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'bible_reading_progress' AND column_name = 'last_synced_batch_id'
+    ")->fetchColumn();
+    if (!$hasBatchId) {
+        $db->exec("ALTER TABLE bible_reading_progress ADD COLUMN last_synced_batch_id VARCHAR(36)");
+    }
 }
 
 function jsonOut(array $data, int $code = 200): void {
@@ -803,4 +815,50 @@ function pickDrawWordChoices(): array {
     $pool = range(0, DRAW_WORD_BANK_SIZE - 1);
     shuffle($pool);
     return array_slice($pool, 0, 4);
+}
+
+/* ------------------------------------------------------------
+   BIBLE READING REWARDS - shared rules
+   Used by both api/bible_reading_heartbeat.php (real-time, ~5s
+   ticks while the connection is live) and
+   api/sync_offline_reading.php (replays a batch of ticks that
+   happened while offline, using client-reported timestamps
+   instead of a server-clock diff, then clips the total against a
+   wall-clock ceiling only the server can attest to - see that
+   file for the anti-fraud reasoning). Both endpoints apply these
+   exact thresholds so an interval either counts or doesn't for
+   the same reasons regardless of which path validated it.
+   ------------------------------------------------------------ */
+const READING_MIN_GAP_MS        = 500;   // faster than this = duplicate/spam call, ignore
+const READING_MAX_GAP_MS        = 8000;  // slower than this = tab was hidden/suspended, ignore
+const READING_MIN_EVENTS        = 2;     // must show at least this many scroll/touch events
+const READING_MIN_SCROLL_PX     = 10;    // ...and at least this much actual scroll movement
+const READING_MS_PER_REWARD     = 60000; // 1 minute of validated reading...
+const READING_POINTS_PER_REWARD = 20;    // ...= 20 points
+
+// Converts this device's CURRENT active_ms_accum into whole reward chunks,
+// credits the resulting points to the wallet, and leaves the remainder in
+// place. Callers are responsible for having already folded any newly-
+// validated reading time into active_ms_accum before calling this.
+function creditReadingAccum(PDO $db, string $deviceId, int $now): int {
+    $db->beginTransaction();
+    $sel = $db->prepare("SELECT active_ms_accum FROM bible_reading_progress WHERE device_id = ? FOR UPDATE");
+    $sel->execute([$deviceId]);
+    $accum = (int)$sel->fetchColumn();
+
+    $creditedPoints = 0;
+    $wholeRewards = intdiv($accum, READING_MS_PER_REWARD);
+    if ($wholeRewards > 0) {
+        $creditedPoints = $wholeRewards * READING_POINTS_PER_REWARD;
+        $accum = $accum % READING_MS_PER_REWARD;
+
+        $db->prepare("UPDATE bible_reading_progress SET active_ms_accum = ? WHERE device_id = ?")
+           ->execute([$accum, $deviceId]);
+
+        $db->prepare("INSERT INTO profiles (device_id, name, avatar, wallet, updated_at) VALUES (?, '', '', ?, ?)
+                      ON DUPLICATE KEY UPDATE wallet = wallet + VALUES(wallet), updated_at = VALUES(updated_at)")
+           ->execute([$deviceId, $creditedPoints, $now]);
+    }
+    $db->commit();
+    return $creditedPoints;
 }

@@ -18,6 +18,18 @@ const BibleReader = (function () {
   let curChapter = 1;
   let totalChapters = 1;
   let isBookmarked = false;
+
+  // Runs onlineFn() when there's a connection, falling back to offlineFn()
+  // if we're offline or the network call fails (dropped connection mid-
+  // request, server unreachable, etc). Used to keep every Bible fetch
+  // working with no connection, backed by OfflineBible's cached copy of
+  // both full translations (see js/offline_bible.js).
+  async function withOfflineFallback(onlineFn, offlineFn) {
+    if (navigator.onLine) {
+      try { return await onlineFn(); } catch (e) { /* fall through to offline copy */ }
+    }
+    return offlineFn();
+  }
   let pendingHl    = null;    // pending highlight: {book, chapter, verse, start, end}
   let searchTimer  = null;
 
@@ -141,11 +153,17 @@ const BibleReader = (function () {
 
     listEl.innerHTML = '<div class="bible-loading">📖 Loading Bible…</div>';
     try {
-      const res = await fetch(`api/bible.php?action=books&version=${curVersion}`);
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      booksCache[curVersion] = data.books;
-      allBooks = data.books;
+      const books = await withOfflineFallback(
+        async () => {
+          const res = await fetch(`api/bible.php?action=books&version=${curVersion}`);
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error);
+          return data.books;
+        },
+        () => OfflineBible.getBooks(curVersion)
+      );
+      booksCache[curVersion] = books;
+      allBooks = books;
       renderBooks(listEl);
     } catch (e) {
       listEl.innerHTML = `<div class="bible-loading" style="color:#e74c3c;">Failed to load Bible. ${e.message}</div>`;
@@ -258,9 +276,15 @@ const BibleReader = (function () {
     saveLastRead(bookNum, bookName, chapter);
 
     try {
-      const res = await fetch(`api/bible.php?action=text&book=${bookNum}&ch=${chapter}&version=${curVersion}`);
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
+      const data = await withOfflineFallback(
+        async () => {
+          const res = await fetch(`api/bible.php?action=text&book=${bookNum}&ch=${chapter}&version=${curVersion}`);
+          const d = await res.json();
+          if (!d.success) throw new Error(d.error);
+          return d;
+        },
+        () => OfflineBible.getChapter(curVersion, bookNum, chapter)
+      );
 
       totalChapters = data.total_chapters;
       updateReaderNav(bookNum, bookName, chapter, data.total_chapters);
@@ -385,6 +409,14 @@ const BibleReader = (function () {
     const delta  = Math.round(rtScrollDeltaSinceHb);
     rtEventsSinceHb = 0;
     rtScrollDeltaSinceHb = 0;
+
+    // No connection: queue this interval locally instead of losing it -
+    // js/offline_queue.js replays the queue through api/sync_offline_reading.php
+    // once back online, which re-validates every interval server-side.
+    if (!navigator.onLine) {
+      if (typeof OfflineQueue !== 'undefined') OfflineQueue.addEvent(events, delta);
+      return;
+    }
     try {
       const res = await fetch('api/bible_reading_heartbeat.php', {
         method: 'POST',
@@ -395,7 +427,12 @@ const BibleReader = (function () {
       if (data.success && data.credited_points > 0) {
         App.showToast(`📖 +${data.credited_points} points for reading!`, 'success');
       }
-    } catch (e) { /* silent - the next heartbeat retries naturally */ }
+    } catch (e) {
+      // navigator.onLine said we had a connection but the request still
+      // failed (captive portal, momentary drop) - queue it rather than
+      // silently losing it like before this feature existed.
+      if (typeof OfflineQueue !== 'undefined') OfflineQueue.addEvent(events, delta);
+    }
   }
 
   // ── Bookmark ──────────────────────────────────────────────
@@ -592,9 +629,15 @@ const BibleReader = (function () {
     if (status)  status.textContent = 'Searching…';
     if (results) results.innerHTML  = '';
     try {
-      const res  = await fetch(`api/bible.php?action=search&q=${encodeURIComponent(q)}&version=${curVersion}`);
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
+      const data = await withOfflineFallback(
+        async () => {
+          const res  = await fetch(`api/bible.php?action=search&q=${encodeURIComponent(q)}&version=${curVersion}`);
+          const d = await res.json();
+          if (!d.success) throw new Error(d.error);
+          return d;
+        },
+        () => OfflineBible.search(curVersion, q)
+      );
       const count = data.results.length, total = data.total;
       if (status) status.textContent = count === 0 ? 'No results.'
         : count < total ? `Showing first ${count} of ${total} results` : `${total} result${total !== 1 ? 's' : ''}`;

@@ -22,12 +22,8 @@ require_once __DIR__ . '/db.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { jsonOut([]); }
 
-const READING_MIN_GAP_MS    = 500;    // faster than this = duplicate/spam call, ignore
-const READING_MAX_GAP_MS    = 8000;   // slower than this = tab was hidden/suspended, ignore
-const READING_MIN_EVENTS    = 2;      // must show at least this many scroll/touch events
-const READING_MIN_SCROLL_PX = 10;     // ...and at least this much actual scroll movement
-const READING_MS_PER_REWARD = 60000;  // 1 minute of validated reading...
-const READING_POINTS_PER_REWARD = 20; // ...= 20 points
+// READING_* constants and creditReadingAccum() live in db.php, shared with
+// api/sync_offline_reading.php's offline-batch replay path.
 
 $input       = getInput();
 $deviceId    = trim($input['device_id'] ?? '');
@@ -62,25 +58,11 @@ $db->prepare("
     $now, $deviceId,
 ]);
 
-$db->beginTransaction();
-$sel = $db->prepare("SELECT active_ms_accum FROM bible_reading_progress WHERE device_id = ? FOR UPDATE");
-$sel->execute([$deviceId]);
-$accum = (int)$sel->fetchColumn();
+$creditedPoints = creditReadingAccum($db, $deviceId, $now);
 
-$creditedPoints = 0;
-$wholeRewards   = intdiv($accum, READING_MS_PER_REWARD);
-if ($wholeRewards > 0) {
-    $creditedPoints = $wholeRewards * READING_POINTS_PER_REWARD;
-    $accum = $accum % READING_MS_PER_REWARD;
-
-    $db->prepare("UPDATE bible_reading_progress SET active_ms_accum = ? WHERE device_id = ?")
-       ->execute([$accum, $deviceId]);
-
-    $db->prepare("INSERT INTO profiles (device_id, name, avatar, wallet, updated_at) VALUES (?, '', '', ?, ?)
-                  ON DUPLICATE KEY UPDATE wallet = wallet + VALUES(wallet), updated_at = VALUES(updated_at)")
-       ->execute([$deviceId, $creditedPoints, $now]);
-}
-$db->commit();
+$afterStmt = $db->prepare("SELECT active_ms_accum FROM bible_reading_progress WHERE device_id = ?");
+$afterStmt->execute([$deviceId]);
+$accum = (int)$afterStmt->fetchColumn();
 
 $walletStmt = $db->prepare("SELECT wallet FROM profiles WHERE device_id = ?");
 $walletStmt->execute([$deviceId]);
